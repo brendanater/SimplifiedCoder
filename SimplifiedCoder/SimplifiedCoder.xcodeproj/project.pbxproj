@@ -8,12 +8,29 @@
 
 /* Begin PBXBuildFile section */
 		8BA33A4F1F4E3D2900BA7334 /* SimplifiedCoder.h in Headers */ = {isa = PBXBuildFile; fileRef = 8BA33A4D1F4E3D2900BA7334 /* SimplifiedCoder.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		8BA33A561F4E3DB000BA7334 /* Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA33A551F4E3DB000BA7334 /* Encoder.swift */; };
+		8BA33A5E1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA33A5D1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift */; };
+		8BA33A601F4E3DCB00BA7334 /* SimplifiedCoder.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8BA33A4A1F4E3D2900BA7334 /* SimplifiedCoder.framework */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8BA33A611F4E3DCB00BA7334 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8BA33A411F4E3D2900BA7334 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8BA33A491F4E3D2900BA7334;
+			remoteInfo = SimplifiedCoder;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		8BA33A4A1F4E3D2900BA7334 /* SimplifiedCoder.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SimplifiedCoder.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		8BA33A4D1F4E3D2900BA7334 /* SimplifiedCoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SimplifiedCoder.h; sourceTree = "<group>"; };
 		8BA33A4E1F4E3D2900BA7334 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8BA33A551F4E3DB000BA7334 /* Encoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Encoder.swift; sourceTree = "<group>"; };
+		8BA33A5B1F4E3DCB00BA7334 /* SimplifiedCoderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SimplifiedCoderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8BA33A5D1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplifiedCoderTests.swift; sourceTree = "<group>"; };
+		8BA33A5F1F4E3DCB00BA7334 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -24,6 +41,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8BA33A581F4E3DCB00BA7334 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8BA33A601F4E3DCB00BA7334 /* SimplifiedCoder.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -31,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				8BA33A4C1F4E3D2900BA7334 /* SimplifiedCoder */,
+				8BA33A5C1F4E3DCB00BA7334 /* SimplifiedCoderTests */,
 				8BA33A4B1F4E3D2900BA7334 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -39,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				8BA33A4A1F4E3D2900BA7334 /* SimplifiedCoder.framework */,
+				8BA33A5B1F4E3DCB00BA7334 /* SimplifiedCoderTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,8 +75,18 @@
 			children = (
 				8BA33A4D1F4E3D2900BA7334 /* SimplifiedCoder.h */,
 				8BA33A4E1F4E3D2900BA7334 /* Info.plist */,
+				8BA33A551F4E3DB000BA7334 /* Encoder.swift */,
 			);
 			path = SimplifiedCoder;
+			sourceTree = "<group>";
+		};
+		8BA33A5C1F4E3DCB00BA7334 /* SimplifiedCoderTests */ = {
+			isa = PBXGroup;
+			children = (
+				8BA33A5D1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift */,
+				8BA33A5F1F4E3DCB00BA7334 /* Info.plist */,
+			);
+			path = SimplifiedCoderTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -84,16 +121,39 @@
 			productReference = 8BA33A4A1F4E3D2900BA7334 /* SimplifiedCoder.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		8BA33A5A1F4E3DCB00BA7334 /* SimplifiedCoderTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8BA33A631F4E3DCB00BA7334 /* Build configuration list for PBXNativeTarget "SimplifiedCoderTests" */;
+			buildPhases = (
+				8BA33A571F4E3DCB00BA7334 /* Sources */,
+				8BA33A581F4E3DCB00BA7334 /* Frameworks */,
+				8BA33A591F4E3DCB00BA7334 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8BA33A621F4E3DCB00BA7334 /* PBXTargetDependency */,
+			);
+			name = SimplifiedCoderTests;
+			productName = SimplifiedCoderTests;
+			productReference = 8BA33A5B1F4E3DCB00BA7334 /* SimplifiedCoderTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
 		8BA33A411F4E3D2900BA7334 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				LastSwiftUpdateCheck = 0900;
 				LastUpgradeCheck = 0900;
 				ORGANIZATIONNAME = OKAY;
 				TargetAttributes = {
 					8BA33A491F4E3D2900BA7334 = {
+						CreatedOnToolsVersion = 9.0;
+						LastSwiftMigration = 0900;
+					};
+					8BA33A5A1F4E3DCB00BA7334 = {
 						CreatedOnToolsVersion = 9.0;
 					};
 				};
@@ -111,12 +171,20 @@
 			projectRoot = "";
 			targets = (
 				8BA33A491F4E3D2900BA7334 /* SimplifiedCoder */,
+				8BA33A5A1F4E3DCB00BA7334 /* SimplifiedCoderTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		8BA33A481F4E3D2900BA7334 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8BA33A591F4E3DCB00BA7334 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -130,10 +198,27 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8BA33A561F4E3DB000BA7334 /* Encoder.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8BA33A571F4E3DCB00BA7334 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8BA33A5E1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8BA33A621F4E3DCB00BA7334 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8BA33A491F4E3D2900BA7334 /* SimplifiedCoder */;
+			targetProxy = 8BA33A611F4E3DCB00BA7334 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		8BA33A501F4E3D2900BA7334 /* Debug */ = {
@@ -252,6 +337,29 @@
 		8BA33A531F4E3D2900BA7334 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 8M3VJAE87S;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INFOPLIST_FILE = SimplifiedCoder/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.okay.Todo5.SimplifiedCoder;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 4.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8BA33A541F4E3D2900BA7334 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 8M3VJAE87S;
@@ -267,23 +375,29 @@
 				SWIFT_VERSION = 4.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Debug;
+			name = Release;
 		};
-		8BA33A541F4E3D2900BA7334 /* Release */ = {
+		8BA33A641F4E3DCB00BA7334 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
-				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 8M3VJAE87S;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				INFOPLIST_FILE = SimplifiedCoder/Info.plist;
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				INFOPLIST_FILE = SimplifiedCoderTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.okay.Todo5.SimplifiedCoder;
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				SKIP_INSTALL = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.okay.Todo5.SimplifiedCoderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 4.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8BA33A651F4E3DCB00BA7334 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEVELOPMENT_TEAM = 8M3VJAE87S;
+				INFOPLIST_FILE = SimplifiedCoderTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.okay.Todo5.SimplifiedCoderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 4.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -306,6 +420,15 @@
 			buildConfigurations = (
 				8BA33A531F4E3D2900BA7334 /* Debug */,
 				8BA33A541F4E3D2900BA7334 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8BA33A631F4E3DCB00BA7334 /* Build configuration list for PBXNativeTarget "SimplifiedCoderTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8BA33A641F4E3DCB00BA7334 /* Debug */,
+				8BA33A651F4E3DCB00BA7334 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
