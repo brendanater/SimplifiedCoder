@@ -14,8 +14,7 @@ import Foundation
 protocol TopLevelEncoder {
     
     func encode(_ value: Encodable) throws -> Data
-    
-    func encode(value: Encodable) throws -> Any
+    func encode(  value: Encodable) throws -> Any
 }
 
 /// a type that can convert "box" values from an encoder
