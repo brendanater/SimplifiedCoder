@@ -238,7 +238,7 @@ extension Base where Self.UnkeyedContainerType.BaseEncoder == Self {
     }
 }
 
-fileprivate func _rawValue_<_Self>(from key: CodingKey, _ useStringValue: Bool, _: _Self.Type) -> Any {
+fileprivate func _rawValue_<_Self>(from key: CodingKey, _ useStringValue: Bool, _ self: _Self.Type) -> Any {
     
     if useStringValue {
         return key.stringValue
