@@ -8,7 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		4968F0421F53109500DC43C0 /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4968F0411F53109500DC43C0 /* Decoder.swift */; };
-		8B9B0B9D1F570DE7005883C3 /* Decoder reference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B9B0B9C1F570DE7005883C3 /* Decoder reference.swift */; };
+		8B9B0B9D1F570DE7005883C3 /* Decoder copy-paste.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B9B0B9C1F570DE7005883C3 /* Decoder copy-paste.swift */; };
+		8B9B0B9F1F5752AE005883C3 /* Decoder copy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B9B0B9E1F5752AE005883C3 /* Decoder copy.swift */; };
 		8BA33A4F1F4E3D2900BA7334 /* SimplifiedCoder.h in Headers */ = {isa = PBXBuildFile; fileRef = 8BA33A4D1F4E3D2900BA7334 /* SimplifiedCoder.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		8BA33A561F4E3DB000BA7334 /* Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA33A551F4E3DB000BA7334 /* Encoder.swift */; };
 		8BA33A5E1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA33A5D1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift */; };
@@ -27,7 +28,8 @@
 
 /* Begin PBXFileReference section */
 		4968F0411F53109500DC43C0 /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
-		8B9B0B9C1F570DE7005883C3 /* Decoder reference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Decoder reference.swift"; sourceTree = "<group>"; };
+		8B9B0B9C1F570DE7005883C3 /* Decoder copy-paste.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Decoder copy-paste.swift"; sourceTree = "<group>"; };
+		8B9B0B9E1F5752AE005883C3 /* Decoder copy.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Decoder copy.swift"; sourceTree = "<group>"; };
 		8BA33A4A1F4E3D2900BA7334 /* SimplifiedCoder.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SimplifiedCoder.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		8BA33A4D1F4E3D2900BA7334 /* SimplifiedCoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SimplifiedCoder.h; sourceTree = "<group>"; };
 		8BA33A4E1F4E3D2900BA7334 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -81,7 +83,8 @@
 				8BA33A4E1F4E3D2900BA7334 /* Info.plist */,
 				8BA33A551F4E3DB000BA7334 /* Encoder.swift */,
 				4968F0411F53109500DC43C0 /* Decoder.swift */,
-				8B9B0B9C1F570DE7005883C3 /* Decoder reference.swift */,
+				8B9B0B9E1F5752AE005883C3 /* Decoder copy.swift */,
+				8B9B0B9C1F570DE7005883C3 /* Decoder copy-paste.swift */,
 			);
 			path = SimplifiedCoder;
 			sourceTree = "<group>";
@@ -206,7 +209,8 @@
 			files = (
 				4968F0421F53109500DC43C0 /* Decoder.swift in Sources */,
 				8BA33A561F4E3DB000BA7334 /* Encoder.swift in Sources */,
-				8B9B0B9D1F570DE7005883C3 /* Decoder reference.swift in Sources */,
+				8B9B0B9F1F5752AE005883C3 /* Decoder copy.swift in Sources */,
+				8B9B0B9D1F570DE7005883C3 /* Decoder copy-paste.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
