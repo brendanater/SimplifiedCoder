@@ -19,18 +19,18 @@ struct NumberLossyConversionStrategy: OptionSet {
     let rawValue: Int
     
     static let dontAllow = NumberLossyConversionStrategy(rawValue: 0)
-    /// use init(NSNumber)
+    /// use Number.init(NSNumber)
     static let initNSNumber = NumberLossyConversionStrategy(rawValue: 1)
-    /// use init(clamping: Int or UInt)
+    /// use Number.init(clamping: Int or UInt)
     /// float and double default to init(NSNumber)
     static let clampingIntegers = NumberLossyConversionStrategy(rawValue: 2)
-    /// use init(truncating: NSNumber)
+    /// use Number.init(truncating: NSNumber)
     static let truncating = NumberLossyConversionStrategy(rawValue: 3)
 
 }
 
 extension JSONDecoder {
-    fileprivate typealias _Options = (
+    typealias _Options2 = (
         dateDecodingStrategy: DateDecodingStrategy,
         dataDecodingStrategy: DataDecodingStrategy,
         nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy,
@@ -40,28 +40,29 @@ extension JSONDecoder {
 }
 
 
-fileprivate class _JSONDecoder : Decoder {
+class Base2 : Decoder {
     // MARK: Properties
     /// The decoder's storage.
-    fileprivate var storage: [Any]
+    var storage: [Any]
     
-    typealias KeyedContainerType = _JSONKeyedDecodingContainer
-    typealias UnkeyedContainerType = _JSONUnkeyedDecodingContainer
+    typealias KeyedContainerType = KeyedContainer2
+    typealias UnkeyedContainerType = UnkeyedContainer2
     
-    typealias Options = JSONDecoder._Options
+    typealias Options = JSONDecoder._Options2
     
     /// Options set on the top-level decoder.
-    fileprivate let options: Options
+    let options: Options
     
     /// The path to the current point in encoding.
-    fileprivate(set) public var codingPath: [CodingKey] = []
+    private(set) public var codingPath: [CodingKey] = []
     
     /// Contextual user-provided information for use during encoding.
     public var userInfo: [CodingUserInfoKey : Any]
     
     // MARK: - Initialization
     /// Initializes `self` with the given top-level container and options.
-    fileprivate init(value: Any, codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any]) {
+    init(value: Any, codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any]) {
+        
         self.storage = [value]
         self.codingPath = codingPath
         self.options = options
@@ -94,7 +95,7 @@ fileprivate class _JSONDecoder : Decoder {
     }
 }
 
-extension _JSONDecoder : SingleValueDecodingContainer {
+extension Base2 : SingleValueDecodingContainer {
     // MARK: SingleValueDecodingContainer Methods
     
     public func decodeNil() -> Bool {
@@ -143,7 +144,7 @@ extension _JSONDecoder : SingleValueDecodingContainer {
 }
 
 // unboxing
-extension _JSONDecoder {
+extension Base2 {
     
     func notFound<T>(_ type: T.Type, _ typeDescription: String? = nil) -> UnboxError {
         
@@ -221,7 +222,7 @@ extension _JSONDecoder {
             case .truncating:
                 return T(truncating: number)
                 
-            default: fatalError("Unknown \(NumberLossyConversionStrategy.self) override \(_JSONDecoder.self).convert(number:)")
+            default: fatalError("Unknown \(NumberLossyConversionStrategy.self) override \(Base2.self).convert(number:)")
                 
             }
         }
@@ -402,23 +403,22 @@ extension _JSONDecoder {
     
     func redecode<T: Decodable>(_ value: Any) throws -> T {
         
-        // use this value to decode from
+        // use this value to decode from (same as creating a new decoder)
         self.storage.append(value)
         let decoded = try T(from: self)
-        // not decoding with this value anymore
+        // not decoding with this value anymore (same as manually deinitializing the new decoder)
         self.storage.removeLast()
-        
         return decoded
     }
 }
 
 // MARK: Decoding Containers
-fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProtocol {
+struct KeyedContainer2<K : CodingKey> : KeyedDecodingContainerProtocol {
     typealias Key = K
     
-    typealias UnkeyedContainerType = _JSONUnkeyedDecodingContainer
+    typealias UnkeyedContainerType = UnkeyedContainer
     
-    typealias BaseDecoder = _JSONDecoder
+    typealias BaseDecoder = Base2
     
     // MARK: Properties
     /// A reference to the decoder we're reading from.
@@ -436,7 +436,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     
     // MARK: - Initialization
     /// Initializes `self` by referencing the given decoder and container.
-    fileprivate init(decoder: BaseDecoder, value: Any, nestedPath: [CodingKey]) throws {
+    init(decoder: BaseDecoder, value: Any, nestedPath: [CodingKey]) throws {
         
         guard let dictionary = value as? NSDictionary else {
             throw decoder.failedToUnbox(value, to: KeyedDecodingContainer<K>.self, "keyed decoding container")
@@ -455,7 +455,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     public var allKeys: [Key] {
         return self.container.allKeys.flatMap {
             
-            if _JSONKeyedDecodingContainer.usesStringValue, let string = $0 as? String {
+            if KeyedContainer2.usesStringValue, let string = $0 as? String {
                 return Key(stringValue: string)
                 
             } else if let int = $0 as? Int {
@@ -469,7 +469,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     
     func _key(from key: CodingKey) -> Any {
         
-        if _JSONKeyedDecodingContainer.usesStringValue {
+        if KeyedContainer2.usesStringValue {
             return key.stringValue
             
         } else {
@@ -534,7 +534,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     public func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
         
         return try KeyedDecodingContainer(
-            _JSONKeyedDecodingContainer<NestedKey>(
+            KeyedContainer2<NestedKey>(
                 decoder: decoder,
                 value: value(forKey: key),
                 nestedPath: nestedPath + [key]
@@ -544,7 +544,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     
     public func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
         
-        return try _JSONUnkeyedDecodingContainer(
+        return try UnkeyedContainer2(
             decoder: self.decoder,
             value: value(forKey: key),
             nestedPath: nestedPath + [key]
@@ -573,12 +573,12 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
 }
 
 
-fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
+struct UnkeyedContainer2 : UnkeyedDecodingContainer {
     // MARK: Properties
     
-    typealias BaseDecoder = _JSONDecoder
+    typealias BaseDecoder = Base2
     
-    typealias KeyedContainerType = _JSONKeyedDecodingContainer
+    typealias KeyedContainerType = KeyedContainer2
     
     /// A reference to the container we're reading from.
     private let container: NSArray
@@ -593,13 +593,13 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     
     /// The index of the element we're decoding.
     // must call next(for:) before using
-    private(set) public var currentIndex = -1
+    private(set) public var currentIndex = 0
     
     let nestedPath: [CodingKey]
     
     // MARK: - Initialization
     /// Initializes `self` by referencing the given decoder and container.
-    fileprivate init(decoder: BaseDecoder, value: Any, nestedPath: [CodingKey]) throws {
+    init(decoder: BaseDecoder, value: Any, nestedPath: [CodingKey]) throws {
         
         guard let container = value as? NSArray else {
             throw decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "unkeyed decoding container")
@@ -612,7 +612,6 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     }
     
     // MARK: - UnkeyedDecodingContainer Methods
-    // why optional?
     public var count: Int? {
         return self.container.count
     }
@@ -624,8 +623,6 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     /// gets the next value if not at end or throws valueNotFound(type, context)
     /// increments currentIndex
     mutating func next<T>(_ type: T.Type, _ typeDescription: String? = nil) throws -> Any {
-        
-        currentIndex += 1
         
         if isAtEnd {
             
@@ -640,16 +637,21 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
             )
         }
         
+        // avoid this pitfall, isAtEnd is/should be/will be called before decoding a value, so, isAtEnd must be correct before getting next
+        
+        defer { currentIndex += 1 }
+        
         return container[currentIndex]
     }
     
     public var isAtEnd: Bool {
+        
         return currentIndex >= container.count
     }
     
     public mutating func decodeNil() throws -> Bool {
         
-        return try isNil(next(NSNull.self))
+        return self.isAtEnd || isNil(container[currentIndex])
     }
     
     mutating func decode<T>(with unbox: (Any)throws->T) throws -> T {
@@ -657,7 +659,7 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         do {
             return try unbox(next(T.self))
         } catch {
-            throw decoder.error(error, at: codingPath)
+            throw decoder.error(error, at: codingPath + [currentKey])
         }
     }
     
@@ -680,7 +682,7 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     public mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
         
         return try KeyedDecodingContainer(
-            _JSONKeyedDecodingContainer<NestedKey>(
+            KeyedContainer2<NestedKey>(
                 decoder: decoder,
                 value: next(KeyedDecodingContainer<NestedKey>.self, "nested keyed container"),
                 nestedPath: nestedPath + [currentKey]
@@ -690,7 +692,7 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     
     public mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
         
-        return try _JSONUnkeyedDecodingContainer(
+        return try UnkeyedContainer2(
             decoder: decoder,
             value: next(UnkeyedDecodingContainer.self, "nested unkeyed container"),
             nestedPath: nestedPath + [currentKey]
@@ -701,7 +703,7 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         
         return try BaseDecoder(
             value: next(Decoder.self, "value for super decoder"),
-            codingPath: codingPath + ["super, called at index \(currentKey)"],
+            codingPath: codingPath + ["super: \(currentKey)"],
             options: decoder.options,
             userInfo: decoder.userInfo
         )
@@ -757,13 +759,13 @@ enum UnboxError: Error {
     }
 }
 
-fileprivate protocol ConvertibleNumber {
+protocol ConvertibleNumber {
     init?(exactly: NSNumber)
     init(truncating: NSNumber)
     init(_ value: NSNumber)
 }
 
-fileprivate protocol ConvertibleInteger: ConvertibleNumber {
+protocol ConvertibleInteger: ConvertibleNumber {
     init(clamping: Int)
     init(clamping: UInt)
 }
