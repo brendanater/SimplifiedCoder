@@ -58,10 +58,10 @@ struct EncoderReferenceReturnStrategy: OptionSet {
     static let merge = EncoderReferenceReturnStrategy(rawValue: 2)
 }
 
-protocol Base: class, Encoder, SingleValueEncodingContainer {
+protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     
-    associatedtype KeyedContainerType: KeyedContainer
-    associatedtype UnkeyedContainerType: UnkeyedContainer
+    associatedtype KeyedContainerType: EncoderKeyedContainer
+    associatedtype UnkeyedContainerType: EncoderUnkeyedContainer
     
     associatedtype Options
     
@@ -79,7 +79,7 @@ protocol Base: class, Encoder, SingleValueEncodingContainer {
     var superKeyedReturnStrategy: EncoderReferenceReturnStrategy {get}
 }
 
-extension Base {
+extension EncoderBase {
     
     var superKeyedReturnStrategy: EncoderReferenceReturnStrategy {
         return .merge
@@ -157,8 +157,6 @@ extension Base {
         
         if storage.count == count {
             fatalError("\(value) did not encode a value")
-            // TODO: find out if this matters: "return default container"
-            // return NSMutableDictionary()
             
         } else {
             
@@ -192,7 +190,7 @@ extension Base {
     }
 }
 
-extension Base where Self.KeyedContainerType.BaseEncoder == Self {
+extension EncoderBase where Self.KeyedContainerType.Base == Self {
     
     func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
         
@@ -215,7 +213,7 @@ extension Base where Self.KeyedContainerType.BaseEncoder == Self {
     }
 }
 
-extension Base where Self.UnkeyedContainerType.BaseEncoder == Self {
+extension EncoderBase where Self.UnkeyedContainerType.Base == Self {
     
     func unkeyedContainer() -> UnkeyedEncodingContainer {
         
@@ -256,22 +254,22 @@ enum ReferenceObject {
     case keyed(NSMutableDictionary, key: CodingKey)
 }
 
-protocol Reference: Base {
+protocol EncoderReference: EncoderBase {
     
-    associatedtype BaseEncoder: Base
+    associatedtype Base: EncoderBase
     
     var reference: ReferenceObject {get set}
     var previousPath: [CodingKey] {get set}
     var returnStrategy: EncoderReferenceReturnStrategy {get set}
     
-    init(_ _super: BaseEncoder, reference: ReferenceObject, nestedPath: [CodingKey])
+    init(_ _super: Base, reference: ReferenceObject, nestedPath: [CodingKey])
     
     static var usesStringValue: Bool {get}
     
     // remember: deinit { willDeinit() }
 }
 
-extension Reference {
+extension EncoderReference {
     
     var superKey: CodingKey {
         switch reference {
@@ -311,9 +309,9 @@ extension Reference {
     }
 }
 
-extension Reference where BaseEncoder.Options == Self.Options {
+extension EncoderReference where Base.Options == Self.Options {
     
-    init(_ _super: BaseEncoder, reference: ReferenceObject, nestedPath: [CodingKey]) {
+    init(_ _super: Base, reference: ReferenceObject, nestedPath: [CodingKey]) {
         
         self.init(options: _super.options, userInfo: _super.userInfo)
         
@@ -324,20 +322,20 @@ extension Reference where BaseEncoder.Options == Self.Options {
     }
 }
 
-protocol UnkeyedContainer: UnkeyedEncodingContainer {
+protocol EncoderUnkeyedContainer: UnkeyedEncodingContainer {
     
-    associatedtype KeyedContainerType: KeyedContainer
-    associatedtype ReferenceType: Reference
-    associatedtype BaseEncoder: Base
+    associatedtype KeyedContainerType: EncoderKeyedContainer
+    associatedtype ReferenceType: EncoderReference
+    associatedtype Base: EncoderBase
     
-    var encoder: BaseEncoder {get}
+    var encoder: Base {get}
     var container: NSMutableArray {get}
     var nestedPath: [CodingKey] {get}
     
-    init(encoder: BaseEncoder, container: NSMutableArray, nestedPath: [CodingKey])
+    init(encoder: Base, container: NSMutableArray, nestedPath: [CodingKey])
 }
 
-extension UnkeyedContainer {
+extension EncoderUnkeyedContainer {
     
     var count: Int {
         return container.count
@@ -387,7 +385,7 @@ extension UnkeyedContainer {
     }
 }
 
-extension UnkeyedContainer where Self.KeyedContainerType.BaseEncoder == Self.BaseEncoder {
+extension EncoderUnkeyedContainer where Self.KeyedContainerType.Base == Self.Base {
     func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
         
         let container = NSMutableDictionary()
@@ -398,7 +396,7 @@ extension UnkeyedContainer where Self.KeyedContainerType.BaseEncoder == Self.Bas
     }
 }
 
-extension UnkeyedContainer where Self.ReferenceType.BaseEncoder == Self.BaseEncoder {
+extension EncoderUnkeyedContainer where Self.ReferenceType.Base == Self.Base {
     
     func superEncoder() -> Encoder {
         
@@ -409,26 +407,26 @@ extension UnkeyedContainer where Self.ReferenceType.BaseEncoder == Self.BaseEnco
     }
 }
 
-protocol KeyedContainer: KeyedEncodingContainerProtocol {
+protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     
-    associatedtype UnkeyedContainerType: UnkeyedContainer
-    associatedtype ReferenceType: Reference
-    associatedtype BaseEncoder: Base
+    associatedtype UnkeyedContainerType: EncoderUnkeyedContainer
+    associatedtype ReferenceType: EncoderReference
+    associatedtype Base: EncoderBase
     
-    var encoder: BaseEncoder {get}
+    var encoder: Base {get}
     var container: NSMutableDictionary {get}
     var nestedPath: [CodingKey] {get}
     
     // nestedPath is seperate from encoder because a nestedContainer must have a path, but, the value is set directly to the container, instead of the encoder.
     
-    init(encoder: BaseEncoder, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type)
+    init(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type)
     
-    static func initSelf<Key>(encoder: BaseEncoder, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
+    static func initSelf<Key>(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
     
     var usesStringValue: Bool {get}
 }
 
-extension KeyedContainer {
+extension EncoderKeyedContainer {
     
     var codingPath: [CodingKey] {
         return encoder.codingPath + nestedPath
@@ -478,7 +476,7 @@ extension KeyedContainer {
     }
 }
 
-extension KeyedContainer where Self.UnkeyedContainerType.BaseEncoder == Self.BaseEncoder {
+extension EncoderKeyedContainer where Self.UnkeyedContainerType.Base == Self.Base {
     
     func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
         
@@ -490,7 +488,7 @@ extension KeyedContainer where Self.UnkeyedContainerType.BaseEncoder == Self.Bas
     }
 }
 
-extension KeyedContainer where Self.ReferenceType.BaseEncoder == Self.BaseEncoder {
+extension EncoderKeyedContainer where Self.ReferenceType.Base == Self.Base {
     
     func superEncoder() -> Encoder {
         
