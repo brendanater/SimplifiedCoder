@@ -28,8 +28,8 @@ extension JSONEncoder {
     )
 }
 
-// MARK: - _JSONEncoder
-fileprivate class _JSONEncoder : Encoder {
+// MARK: - EncoderBase
+fileprivate class EncoderBase : Encoder {
     // MARK: Properties
     /// The encoder's storage.
     fileprivate var storage: [(key: CodingKey?, value: Any)] = []
@@ -40,18 +40,18 @@ fileprivate class _JSONEncoder : Encoder {
     fileprivate let options: Options
     
     /// The path to the current point in encoding.
-    public var codingPath: [CodingKey]
+    public var codingPath: [CodingKey] {
+        return storage.flatMap { $0.key }
+    }
     
     /// Contextual user-provided information for use during encoding.
-    public var userInfo: [CodingUserInfoKey : Any] {
-        return self.options.userInfo
-    }
+    public var userInfo: [CodingUserInfoKey : Any]
     
     // MARK: - Initialization
     /// Initializes `self` with the given top-level encoder options.
-    fileprivate init(options: Options, codingPath: [CodingKey] = []) {
+    fileprivate init(options: Options, userInfo: [CodingUserInfoKey : Any]) {
         self.options = options
-        self.codingPath = codingPath
+        self.userInfo = userInfo
     }
     
     var key: CodingKey? = nil
@@ -86,7 +86,7 @@ fileprivate class _JSONEncoder : Encoder {
             topContainer = container
         }
         
-        let container = _JSONKeyedEncodingContainer<Key>(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
+        let container = EncoderKeyedContainer<Key>(referencing: self, codingPath: self.codingPath, wrapping: topContainer, nestedPath: [])
         return KeyedEncodingContainer(container)
     }
     
@@ -107,7 +107,7 @@ fileprivate class _JSONEncoder : Encoder {
             topContainer = container
         }
         
-        return _JSONUnkeyedEncodingContainer(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
+        return EncoderUnkeyedContainer(encoder: self, container: topContainer, nestedPath: [])
     }
     
     public func singleValueContainer() -> SingleValueEncodingContainer {
@@ -116,70 +116,81 @@ fileprivate class _JSONEncoder : Encoder {
 }
 
 // MARK: - Encoding Containers
-fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProtocol {
+fileprivate struct EncoderKeyedContainer<K : CodingKey> : KeyedEncodingContainerProtocol {
     typealias Key = K
     
     // MARK: Properties
     /// A reference to the encoder we're writing to.
-    private let encoder: _JSONEncoder
+    private let encoder: EncoderBase
     
     /// A reference to the container we're writing to.
     private let container: NSMutableDictionary
     
     /// The path of coding keys taken to get to this point in encoding.
-    private(set) public var codingPath: [CodingKey]
+    public var codingPath: [CodingKey] {
+        return encoder.codingPath + nestedPath
+    }
+    
+    var nestedPath: [CodingKey]
+    
+    static var usesStringValue: Bool {
+        return true
+    }
     
     // MARK: - Initialization
     /// Initializes `self` with the given references.
-    fileprivate init(referencing encoder: _JSONEncoder, codingPath: [CodingKey], wrapping container: NSMutableDictionary) {
+    fileprivate init(referencing encoder: EncoderBase, codingPath: [CodingKey], wrapping container: NSMutableDictionary, nestedPath: [CodingKey]) {
+        
+        self.nestedPath = nestedPath
         self.encoder = encoder
-        self.codingPath = codingPath
         self.container = container
     }
     
+    func _key(from key: CodingKey) -> Any {
+        
+        if EncoderKeyedContainer.usesStringValue {
+            return key.stringValue
+        } else {
+            guard key.intValue != nil else { fatalError("Tried to get \(key).intValue, but found nil.") }
+            return key.intValue!
+        }
+    }
+    
+    func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws {
+        
+        do {
+            try self.container[_key(from: key)] = box(value)
+            
+        } catch let error as EncodeError {
+            throw error
+        } catch {
+            throw EncodeError.encodeError(error, atPath: self.codingPath + [key])
+        }
+    }
+    
     // MARK: - KeyedEncodingContainerProtocol Methods
-    public mutating func encodeNil(forKey key: Key)               throws { self.container[key.stringValue] = NSNull() }
-    public mutating func encode(_ value: Bool, forKey key: Key)   throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: Int, forKey key: Key)    throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: Int8, forKey key: Key)   throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: Int16, forKey key: Key)  throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: Int32, forKey key: Key)  throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: Int64, forKey key: Key)  throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: UInt, forKey key: Key)   throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: UInt8, forKey key: Key)  throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: UInt16, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: UInt32, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: UInt64, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
-    public mutating func encode(_ value: String, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
-    
-    public mutating func encode(_ value: Float, forKey key: Key)  throws {
-        // Since the float may be invalid and throw, the coding path needs to contain this key.
-        self.encoder.codingPath.append(key)
-        defer { self.encoder.codingPath.removeLast() }
-        self.container[key.stringValue] = try self.encoder.box(value)
-    }
-    
-    public mutating func encode(_ value: Double, forKey key: Key) throws {
-        // Since the double may be invalid and throw, the coding path needs to contain this key.
-        self.encoder.codingPath.append(key)
-        defer { self.encoder.codingPath.removeLast() }
-        self.container[key.stringValue] = try self.encoder.box(value)
-    }
-    
-    public mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
-        self.encoder.codingPath.append(key)
-        defer { self.encoder.codingPath.removeLast() }
-        self.container[key.stringValue] = try self.encoder.box(value)
-    }
+    public mutating func encodeNil(forKey key: Key)               throws { try encode(()   , with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Bool, forKey key: Key)   throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Int, forKey key: Key)    throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Int8, forKey key: Key)   throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Int16, forKey key: Key)  throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Int32, forKey key: Key)  throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Int64, forKey key: Key)  throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: UInt, forKey key: Key)   throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: UInt8, forKey key: Key)  throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: UInt16, forKey key: Key) throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: UInt32, forKey key: Key) throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: UInt64, forKey key: Key) throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: String, forKey key: Key) throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Float, forKey key: Key)  throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode(_ value: Double, forKey key: Key) throws { try encode(value, with: encoder.box(_:), forKey: key) }
+    public mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws { try encode(value as Encodable, with: encoder.box(_:), forKey: key) }
     
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         let dictionary = NSMutableDictionary()
         self.container[key.stringValue] = dictionary
         
-        self.codingPath.append(key)
-        defer { self.codingPath.removeLast() }
-        
-        let container = _JSONKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary)
+        let container = EncoderKeyedContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary, nestedPath: self.nestedPath + [key])
         return KeyedEncodingContainer(container)
     }
     
@@ -187,340 +198,180 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
         let array = NSMutableArray()
         self.container[key.stringValue] = array
         
-        self.codingPath.append(key)
-        defer { self.codingPath.removeLast() }
-        return _JSONUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: array)
+        return EncoderUnkeyedContainer(encoder: self.encoder, container: array, nestedPath: self.nestedPath + [key])
     }
     
     public mutating func superEncoder() -> Encoder {
-        return _JSONReferencingEncoder(encoder: self.encoder, reference: .keyed(self.container, key: "super"))
+        return EncoderReference(encoder: self.encoder, reference: .keyed(self.container, key: "super"))
     }
     
     public mutating func superEncoder(forKey key: Key) -> Encoder {
-        return _JSONReferencingEncoder(encoder: self.encoder, reference: .keyed(self.container, key: key))
+        return EncoderReference(encoder: self.encoder, reference: .keyed(self.container, key: key))
     }
 }
 
-fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
+fileprivate struct EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     // MARK: Properties
     /// A reference to the encoder we're writing to.
-    private let encoder: _JSONEncoder
+    private let encoder: EncoderBase
     
     /// A reference to the container we're writing to.
     private let container: NSMutableArray
     
     /// The path of coding keys taken to get to this point in encoding.
-    private(set) public var codingPath: [CodingKey]
+    public var codingPath: [CodingKey] {
+        return encoder.codingPath + nestedPath
+    }
     
     /// The number of elements encoded into the container.
     public var count: Int {
         return self.container.count
     }
     
+    var nestedPath: [CodingKey]
+    
     // MARK: - Initialization
     /// Initializes `self` with the given references.
-    fileprivate init(referencing encoder: _JSONEncoder, codingPath: [CodingKey], wrapping container: NSMutableArray) {
+    fileprivate init(encoder: EncoderBase, container: NSMutableArray, nestedPath: [CodingKey]) {
+        
+        self.nestedPath = nestedPath
         self.encoder = encoder
-        self.codingPath = codingPath
         self.container = container
     }
     
+    func encode<T>(_ value: T, with box: (T)throws->Any) throws {
+        
+        do {
+            try self.container.add(box(value))
+            
+        } catch let error as EncodeError {
+            throw error
+        } catch {
+            throw EncodeError.encodeError(error, atPath: self.codingPath + ["index \(count)"])
+        }
+    }
+    
     // MARK: - UnkeyedEncodingContainer Methods
-    public mutating func encodeNil()             throws { self.container.add(NSNull()) }
-    public mutating func encode(_ value: Bool)   throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int)    throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int8)   throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int16)  throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int32)  throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int64)  throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt)   throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt8)  throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt16) throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt32) throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt64) throws { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: String) throws { self.container.add(self.encoder.box(value)) }
-    
-    public mutating func encode(_ value: Float)  throws {
-        // Since the float may be invalid and throw, the coding path needs to contain this key.
-        self.encoder.codingPath.append("index \(self.count)")
-        defer { self.encoder.codingPath.removeLast() }
-        self.container.add(try self.encoder.box(value))
-    }
-    
-    public mutating func encode(_ value: Double) throws {
-        // Since the double may be invalid and throw, the coding path needs to contain this key.
-        self.encoder.codingPath.append("index \(self.count)")
-        defer { self.encoder.codingPath.removeLast() }
-        self.container.add(try self.encoder.box(value))
-    }
-    
-    public mutating func encode<T : Encodable>(_ value: T) throws {
-        self.encoder.codingPath.append("index \(self.count)")
-        defer { self.encoder.codingPath.removeLast() }
-        self.container.add(try self.encoder.box(value))
-    }
+    public mutating func encodeNil()             throws { try encode(()   , with: encoder.box(_:)) }
+    public mutating func encode(_ value: Bool)   throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: Int)    throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: Int8)   throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: Int16)  throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: Int32)  throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: Int64)  throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: UInt)   throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: UInt8)  throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: UInt16) throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: UInt32) throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: UInt64) throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: String) throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: Float)  throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode(_ value: Double) throws { try encode(value, with: encoder.box(_:)) }
+    public mutating func encode<T : Encodable>(_ value: T) throws { try encode(value as Encodable, with: encoder.box(_:)) }
     
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
-        self.codingPath.append("index \(self.count)")
-        defer { self.codingPath.removeLast() }
         
         let dictionary = NSMutableDictionary()
         self.container.add(dictionary)
         
-        let container = _JSONKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary)
+        let container = EncoderKeyedContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary, nestedPath: self.nestedPath + ["index \(count)"])
         return KeyedEncodingContainer(container)
     }
     
     public mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
-        self.codingPath.append("index \(self.count)")
-        defer { self.codingPath.removeLast() }
         
         let array = NSMutableArray()
         self.container.add(array)
-        return _JSONUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: array)
+        
+        return EncoderUnkeyedContainer(encoder: self.encoder, container: array, nestedPath: self.nestedPath + ["index \(count)"])
     }
     
     public mutating func superEncoder() -> Encoder {
         defer { container.add("placeholder") }
-        return _JSONReferencingEncoder(encoder: self.encoder, reference: .unkeyed(self.container, index: container.count))
+        return EncoderReference(encoder: self.encoder, reference: .unkeyed(self.container, index: container.count))
     }
 }
 
-extension _JSONEncoder : SingleValueEncodingContainer {
-    // MARK: - SingleValueEncodingContainer Methods
-    fileprivate func assertCanEncodeNewValue() {
-        precondition(self.canEncodeNewValue, "Attempt to encode value through single value container when previously value already encoded.")
+extension EncoderBase : SingleValueEncodingContainer {
+    
+    func removeKey() -> CodingKey? {
+        defer { self.key = nil }
+        return self.key
     }
     
-    public func encodeNil() throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, NSNull()))
+    func encode<T>(_ value: T, with box: (T)throws->Any) throws {
+        
+        do {
+            let key = self.removeKey()
+            
+            guard key != nil || self.storage.count > 0 else {
+                
+                let v = storage.last!.value
+                let first = "\(v) of type: \(type(of: v))"
+                let second = "\(value) of type: \(T.self)"
+                
+                fatalError("Tried to encode a second value when previously already encoded at path: \(codingPath).  First: \(first) Second: \(second)")
+            }
+            
+            try self.storage.append((key, box(value)))
+            
+        } catch let error as EncodeError {
+            throw error
+        } catch {
+            throw EncodeError.encodeError(error, atPath: self.codingPath)
+        }
     }
     
-    public func encode(_ value: Bool) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
+    public func encodeNil(            ) throws { try encode(()   , with: self.box(_:)) }
+    public func encode(_ value: Bool  ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: Int   ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: Int8  ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: Int16 ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: Int32 ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: Int64 ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: UInt  ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: UInt8 ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: UInt16) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: UInt32) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: UInt64) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: String) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: Float ) throws { try encode(value, with: self.box(_:)) }
+    public func encode(_ value: Double) throws { try encode(value, with: self.box(_:)) }
     
-    public func encode(_ value: Int) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: Int8) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: Int16) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: Int32) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: Int64) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: UInt) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: UInt8) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: UInt16) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: UInt32) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: UInt64) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: String) throws {
-        assertCanEncodeNewValue()
-        self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: Float) throws {
-        assertCanEncodeNewValue()
-        try self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode(_ value: Double) throws {
-        assertCanEncodeNewValue()
-        try self.storage.append((key, self.box(value)))
-    }
-    
-    public func encode<T : Encodable>(_ value: T) throws {
-        assertCanEncodeNewValue()
-        try self.storage.append((key, self.box(value)))
-    }
-}
-
-fileprivate enum FloatingPointError<T: FloatingPoint>: Error {
-    case invalidFloatingPoint(T)
+    public func encode<T : Encodable>(_ value: T) throws { try encode(value as Encodable, with: self.box(_:)) }
 }
 
 // MARK: - Concrete Value Representations
-extension _JSONEncoder {
-    /// Returns the given value boxed in a container appropriate for pushing onto the container stack.
-    fileprivate func box(_ value: Bool)   -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: Int)    -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: Int8)   -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: Int16)  -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: Int32)  -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: Int64)  -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: UInt)   -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: UInt8)  -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: UInt16) -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: UInt32) -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: UInt64) -> Any { return NSNumber(value: value) }
-    fileprivate func box(_ value: String) -> Any { return NSString(string: value) }
+extension EncoderBase {
     
-    fileprivate func box(_ float: Float) throws -> Any {
-        guard !float.isInfinite && !float.isNaN else {
-            guard case let .convertToString(positiveInfinity: posInfString,
-                                            negativeInfinity: negInfString,
-                                            nan: nanString) = self.options.nonConformingFloatEncodingStrategy else {
-                                                throw FloatingPointError.invalidFloatingPoint(float)
-            }
-            
-            if float == Float.infinity {
-                return NSString(string: posInfString)
-            } else if float == -Float.infinity {
-                return NSString(string: negInfString)
-            } else {
-                return NSString(string: nanString)
-            }
-        }
+    func box(_ value: Void  ) throws -> Any{return NSNull()}
+    func box(_ value: Bool  ) throws -> Any { return value }
+    func box(_ value: Int   ) throws -> Any { return value }
+    func box(_ value: Int8  ) throws -> Any { return value }
+    func box(_ value: Int16 ) throws -> Any { return value }
+    func box(_ value: Int32 ) throws -> Any { return value }
+    func box(_ value: Int64 ) throws -> Any { return value }
+    func box(_ value: UInt  ) throws -> Any { return value }
+    func box(_ value: UInt8 ) throws -> Any { return value }
+    func box(_ value: UInt16) throws -> Any { return value }
+    func box(_ value: UInt32) throws -> Any { return value }
+    func box(_ value: UInt64) throws -> Any { return value }
+    func box(_ value: Float ) throws -> Any { return value }
+    func box(_ value: Double) throws -> Any { return value }
+    func box(_ value: String) throws -> Any { return value }
+    func box(_ value: Encodable) throws -> Any {
+        return try reencode(value)
+    }
+    
+    func reencode(_ value: Encodable) throws -> Any {
         
-        return NSNumber(value: float)
-    }
-    
-    fileprivate func box(_ double: Double) throws -> Any {
-        guard !double.isInfinite && !double.isNaN else {
-            guard case let .convertToString(positiveInfinity: posInfString,
-                                            negativeInfinity: negInfString,
-                                            nan: nanString) = self.options.nonConformingFloatEncodingStrategy else {
-                                                throw FloatingPointError.invalidFloatingPoint(double)
-            }
-            
-            if double == Double.infinity {
-                return NSString(string: posInfString)
-            } else if double == -Double.infinity {
-                return NSString(string: negInfString)
-            } else {
-                return NSString(string: nanString)
-            }
-        }
+        let count = self.storage.count
         
-        return NSNumber(value: double)
-    }
-    
-    fileprivate func box(_ date: Date) throws -> Any {
-        switch self.options.dateEncodingStrategy {
-        case .deferredToDate:
-            // Must be called with a surrounding with(pushedKey:) call.
-            try date.encode(to: self)
-            return self.storage.removeLast().value
-            
-        case .secondsSince1970:
-            return NSNumber(value: date.timeIntervalSince1970)
-            
-        case .millisecondsSince1970:
-            return NSNumber(value: 1000.0 * date.timeIntervalSince1970)
-            
-        case .iso8601:
-            if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-                return NSString(string: ISO8601DateFormatter.shared.string(from: date))
-            } else {
-                fatalError("ISO8601DateFormatter is unavailable on this platform.")
-            }
-            
-        case .formatted(let formatter):
-            return NSString(string: formatter.string(from: date))
-            
-        case .custom(let closure):
-            let depth = self.storage.count
-            try closure(date, self)
-            
-            guard self.storage.count > depth else {
-                // The closure didn't encode anything. Return the default keyed container.
-                return NSDictionary()
-            }
-            
-            // We can pop because the closure encoded something.
-            return self.storage.removeLast().value
-        }
-    }
-    
-    fileprivate func box(_ data: Data) throws -> Any {
-        switch self.options.dataEncodingStrategy {
-        case .deferredToData:
-            // Must be called with a surrounding with(pushedKey:) call.
-            try data.encode(to: self)
-            return self.storage.removeLast().value
-            
-        case .base64:
-            return NSString(string: data.base64EncodedString())
-            
-        case .custom(let closure):
-            let depth = self.storage.count
-            try closure(data, self)
-            
-            guard self.storage.count > depth else {
-                // The closure didn't encode anything. Return the default keyed container.
-                return NSDictionary()
-            }
-            
-            // We can pop because the closure encoded something.
-            return self.storage.removeLast().value
-        }
-    }
-    
-    fileprivate func box<T : Encodable>(_ value: T) throws -> Any {
-        return try self.box_(value) ?? NSDictionary()
-    }
-    
-    // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
-    fileprivate func box_<T : Encodable>(_ value: T) throws -> Any? {
-        if T.self == Date.self || T.self == NSDate.self {
-            // Respect Date encoding strategy
-            return try self.box((value as! Date))
-        } else if T.self == Data.self || T.self == NSData.self {
-            // Respect Data encoding strategy
-            return try self.box((value as! Data))
-        } else if T.self == URL.self || T.self == NSURL.self {
-            // Encode URLs as single strings.
-            return self.box((value as! URL).absoluteString)
-        } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
-            // JSONSerialization can natively handle NSDecimalNumber.
-            return (value as! NSDecimalNumber)
-        }
-        
-        // The value should request a container from the _JSONEncoder.
-        let depth = self.storage.count
         try value.encode(to: self)
         
         // The top container should be a new container.
-        guard self.storage.count > depth else {
-            return nil
+        guard self.storage.count > count else {
+            fatalError("\(type(of: value)) did not encode any values.")
         }
         
         return self.storage.removeLast().value
@@ -532,40 +383,45 @@ enum EncoderReferenceValue {
     case unkeyed(NSMutableArray, index: Int)
 }
 
-// MARK: - _JSONReferencingEncoder
-/// _JSONReferencingEncoder is a special subclass of _JSONEncoder which has its own storage, but references the contents of a different encoder.
+// MARK: - EncoderReference
+/// EncoderReference is a special subclass of EncoderBase which has its own storage, but references the contents of a different encoder.
 /// It's used in superEncoder(), which returns a new encoder for encoding a superclass -- the lifetime of the encoder should not escape the scope it's created in, but it doesn't necessarily know when it's done being used (to write to the original container).
-fileprivate class _JSONReferencingEncoder : _JSONEncoder {
+fileprivate class EncoderReference : EncoderBase {
     // MARK: Reference types.
     
     /// The container reference itself.
     private let reference: EncoderReferenceValue
     
+    override var codingPath: [CodingKey] {
+        return previousPath + storage.flatMap { $0.key }
+    }
+    
     var previousPath: [CodingKey]
+    
+    var superKey: CodingKey {
+        switch reference {
+        case .keyed(_, key: let key): return key
+        case .unkeyed(_, index: let index): return "index \(index)"
+        }
+    }
     
     // MARK: - Initialization
     /// Initializes `self` by referencing the given array container in the given encoder.
-    fileprivate init(encoder: _JSONEncoder, reference: EncoderReferenceValue, previousPath: [CodingKey] = []) {
+    fileprivate init(encoder: EncoderBase, reference: EncoderReferenceValue, previousPath: [CodingKey] = []) {
         
         self.previousPath = previousPath
         self.reference = reference
         
-        super.init(options: encoder.options, codingPath: encoder.codingPath)
+        super.init(options: encoder.options, userInfo: encoder.userInfo)
         
-        self.codingPath.append("index: \(index)")
+        self.key = superKey
     }
     
-    // MARK: - Coding Path Operations
-//    fileprivate override var canEncodeNewValue: Bool {
-//        // With a regular encoder, the storage and coding path grow together.
-//        // A referencing encoder, however, inherits its parents coding path, as well as the key it was created for.
-//        // We have to take this into account.
-//        return self.storage.count == self.codingPath.count - self.encoder.codingPath.count - 1
-//    }
+    typealias KeyedContainer = EncoderKeyedContainer<String>
     
     func _key(from key: CodingKey) -> Any {
-        // TODO: setup usesStringValue
-        if true {
+        
+        if KeyedContainer.usesStringValue {
             return key.stringValue
         } else {
             guard key.intValue != nil else { fatalError("Tried to get \(key).intValue, but found nil.") }
@@ -593,6 +449,24 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
     // Finalizes `self` by writing the contents of our storage to the referenced encoder's storage.
     deinit {
         willDeinit()
+    }
+}
+
+/// a wrapping error to associate an unknown error on encode with a codingPath
+enum EncodeError: Error {
+    
+    case encodeError(Error, atPath: [CodingKey])
+    
+    var error: Error {
+        switch self {
+        case .encodeError(let error, atPath: _): return error
+        }
+    }
+    
+    var codingPath: [CodingKey] {
+        switch self {
+        case .encodeError(_, atPath: let codingPath): return codingPath
+        }
     }
 }
 
