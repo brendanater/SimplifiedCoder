@@ -29,88 +29,38 @@ extension JSONEncoder {
 }
 
 // MARK: - EncoderBase
-class EncoderBase : Encoder {
+protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     // MARK: Properties
     /// The encoder's storage.
-    fileprivate var storage: [(key: CodingKey?, value: Any)] = []
+    var storage: [(key: CodingKey?, value: Any)] {get set}
     
-    fileprivate typealias Options = JSONEncoder._Options
+    associatedtype KeyedContainer: EncoderKeyedContainer
+    associatedtype UnkeyedContainer: EncoderUnkeyedContainer
+    associatedtype Options
     
     /// Options set on the top-level encoder.
-    fileprivate let options: Options
+    var options: Options {get}
+    
+    /// Contextual user-provided information for use during encoding.
+    var userInfo: [CodingUserInfoKey : Any] {get}
+    
+    // MARK: - Initialization
+    /// Initializes `self` with the given top-level encoder options.
+    init(options: Options, userInfo: [CodingUserInfoKey : Any])
+    
+    var key: CodingKey? {get set}
+}
+
+extension EncoderBase {
     
     /// The path to the current point in encoding.
     public var codingPath: [CodingKey] {
         return storage.flatMap { $0.key }
     }
     
-    /// Contextual user-provided information for use during encoding.
-    public var userInfo: [CodingUserInfoKey : Any]
-    
-    // MARK: - Initialization
-    /// Initializes `self` with the given top-level encoder options.
-    fileprivate init(options: Options, userInfo: [CodingUserInfoKey : Any]) {
-        self.options = options
-        self.userInfo = userInfo
-    }
-    
-    var key: CodingKey? = nil
-    
     var canEncodeNewValue: Bool {
         return key != nil || self.storage.count == 0
     }
-    
-    // MARK: - Encoder Methods
-    public func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
-        // If an existing keyed container was already requested, return that one.
-        let container: NSMutableDictionary
-        
-        if self.canEncodeNewValue {
-            
-            container = NSMutableDictionary()
-            
-            set(container)
-            
-        } else {
-            
-            if let _container = self.storage.last!.value as? NSMutableDictionary {
-                container = _container
-            } else {
-                preconditionFailure("Attempt to push new keyed encoding container when already previously encoded at this path.")
-            }
-        }
-        
-        return KeyedEncodingContainer(EncoderKeyedContainer<Key>(encoder: self, container: container, nestedPath: []))
-    }
-    
-    public func unkeyedContainer() -> UnkeyedEncodingContainer {
-        // If an existing unkeyed container was already requested, return that one.
-        let container: NSMutableArray
-        
-        if self.canEncodeNewValue {
-            
-            container = NSMutableArray()
-            
-            set(container)
-            
-        } else {
-            
-            if let _container = self.storage.last!.value as? NSMutableArray {
-                container = _container
-            } else {
-                preconditionFailure("Attempt to push new unkeyed encoding container when already previously encoded at this path.")
-            }
-        }
-        
-        return EncoderUnkeyedContainer(encoder: self, container: container, nestedPath: [])
-    }
-    
-    public func singleValueContainer() -> SingleValueEncodingContainer {
-        return self
-    }
-}
-
-extension EncoderBase : SingleValueEncodingContainer {
     
     func removeKey() -> CodingKey? {
         defer { self.key = nil }
@@ -162,10 +112,8 @@ extension EncoderBase : SingleValueEncodingContainer {
     public func encode(_ value: Double) throws { try encode(value, with: self.box(_:)) }
     
     public func encode<T : Encodable>(_ value: T) throws { try encode(value as Encodable, with: self.box(_:)) }
-}
-
-// MARK: - Concrete Value Representations
-extension EncoderBase {
+    
+    // MARK: encoder.box(_:)
     
     func box(_ value: Void  ) throws -> Any{return NSNull()}
     func box(_ value: Bool  ) throws -> Any { return value }
@@ -187,11 +135,11 @@ extension EncoderBase {
         
         return try reencode(value)
         
-//        switch value {
-//        case is Date: return try box(value as Date)
-//        case is URL: return try box(value as URL)
-//        default: return try reencode(value)
-//        }
+        //        switch value {
+        //        case is Date: return try box(value as Date)
+        //        case is URL: return try box(value as URL)
+        //        default: return try reencode(value)
+        //        }
     }
     
     func reencode(_ value: Encodable) throws -> Any {
@@ -207,37 +155,95 @@ extension EncoderBase {
         
         return self.storage.removeLast().value
     }
+    
+    public func singleValueContainer() -> SingleValueEncodingContainer {
+        return self
+    }
+}
+
+extension EncoderBase where Self.KeyedContainer.Base == Self {
+    // MARK: - Encoder Methods
+    func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
+        // If an existing keyed container was already requested, return that one.
+        let container: NSMutableDictionary
+
+        if self.canEncodeNewValue {
+
+            container = NSMutableDictionary()
+
+            set(container)
+
+        } else {
+            // could just crash here, but checks if the last encoded container is the same type and returns that.
+
+            if let _container = self.storage.last!.value as? NSMutableDictionary {
+                container = _container
+            } else {
+                preconditionFailure("Attempt to push new keyed encoding container when already previously encoded at this path.")
+            }
+        }
+        
+        return KeyedContainer.initSelf(encoder: self, container: container, nestedPath: [], keyedBy: Key.self)
+    }
+}
+
+extension EncoderBase where Self.UnkeyedContainer.Base == Self {
+    
+    func unkeyedContainer() -> UnkeyedEncodingContainer {
+        
+        let container: NSMutableArray
+
+        if self.canEncodeNewValue {
+
+            container = NSMutableArray()
+
+            set(container)
+
+        } else {
+            // could just crash here, but checks if the last encoded container is the same type and returns that.
+            
+            if let _container = self.storage.last!.value as? NSMutableArray {
+                container = _container
+            } else {
+                preconditionFailure("Attempt to push new unkeyed encoding container when already previously encoded at this path.")
+            }
+        }
+
+        return UnkeyedContainer(encoder: self, container: container, nestedPath: [])
+    }
+
 }
 
 // MARK: - Encoding Containers
-struct EncoderKeyedContainer<K : CodingKey> : KeyedEncodingContainerProtocol {
-    typealias Key = K
+protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
+    
+    associatedtype UnkeyedContainer: EncoderUnkeyedContainer
+    associatedtype Reference: EncoderReference
+    associatedtype Base: EncoderBase
     
     // MARK: Properties
-    let encoder: EncoderBase
-    let container: NSMutableDictionary
-    let nestedPath: [CodingKey]
+    var encoder: Base {get}
+    var container: NSMutableDictionary {get}
+    var nestedPath: [CodingKey] {get}
+    
+    static var usesStringValue: Bool {get}
+    
+    // MARK: - Initialization
+    /// Initializes `self` with the given references.
+    init(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey])
+    
+    static func initSelf<Key>(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
+}
+
+extension EncoderKeyedContainer {
     
     public var codingPath: [CodingKey] {
         return encoder.codingPath + nestedPath
     }
     
-    static var usesStringValue: Bool {
-        return true
-    }
-    
-    // MARK: - Initialization
-    /// Initializes `self` with the given references.
-    init(encoder: EncoderBase, container: NSMutableDictionary, nestedPath: [CodingKey]) {
-        
-        self.nestedPath = nestedPath
-        self.encoder = encoder
-        self.container = container
-    }
-    
     func _key(from key: CodingKey) -> Any {
         
-        if EncoderKeyedContainer.usesStringValue {
+        if Self.usesStringValue {
             return key.stringValue
         } else {
             guard key.intValue != nil else { fatalError("Tried to get \(key).intValue, but found nil.") }
@@ -281,32 +287,49 @@ struct EncoderKeyedContainer<K : CodingKey> : KeyedEncodingContainerProtocol {
         let container = NSMutableDictionary()
         self.container[_key(from: key)] = container
         
-        return KeyedEncodingContainer(EncoderKeyedContainer<NestedKey>(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key]))
-    }
-    
-    public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        
-        let container = NSMutableArray()
-        self.container[_key(from: key)] = container
-        
-        return EncoderUnkeyedContainer(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key])
-    }
-    
-    public mutating func superEncoder() -> Encoder {
-        return EncoderReference(encoder: self.encoder, reference: .keyed(self.container, key: "super"), previousPath: self.codingPath) // [key] is added from reference
-    }
-    
-    public mutating func superEncoder(forKey key: Key) -> Encoder {
-        return EncoderReference(encoder: self.encoder, reference: .keyed(self.container, key: key), previousPath: self.codingPath)
+        return Self.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key], keyedBy: NestedKey.self)
     }
 }
 
-struct EncoderUnkeyedContainer : UnkeyedEncodingContainer {
-    // MARK: Properties
+extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
     
-    let encoder: EncoderBase
-    let container: NSMutableArray
-    let nestedPath: [CodingKey]
+
+    mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
+
+        let container = NSMutableArray()
+        self.container[_key(from: key)] = container
+
+        return UnkeyedContainer(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key])
+    }
+}
+
+extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
+
+    mutating func superEncoder() -> Encoder {
+        return Reference(encoder: self.encoder, reference: .keyed(self.container, key: "super"), previousPath: self.codingPath) // [key] is added from reference
+    }
+
+    mutating func superEncoder(forKey key: Key) -> Encoder {
+        return Reference(encoder: self.encoder, reference: .keyed(self.container, key: key), previousPath: self.codingPath)
+    }
+}
+
+protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
+    // MARK: Properties
+    associatedtype KeyedContainer: EncoderKeyedContainer
+    associatedtype Reference: EncoderReference
+    associatedtype Base: EncoderBase
+    
+    var encoder: Base {get}
+    var container: NSMutableArray {get}
+    var nestedPath: [CodingKey] {get}
+    
+    // MARK: - Initialization
+    /// Initializes `self` with the given references.
+    init(encoder: Base, container: NSMutableArray, nestedPath: [CodingKey])
+}
+
+extension EncoderUnkeyedContainer {
     
     /// The path of coding keys taken to get to this point in encoding.
     public var codingPath: [CodingKey] {
@@ -316,15 +339,6 @@ struct EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     /// The number of elements encoded into the container.
     public var count: Int {
         return self.container.count
-    }
-    
-    // MARK: - Initialization
-    /// Initializes `self` with the given references.
-    init(encoder: EncoderBase, container: NSMutableArray, nestedPath: [CodingKey]) {
-        
-        self.nestedPath = nestedPath
-        self.encoder = encoder
-        self.container = container
     }
     
     func encode<T>(_ value: T, with box: (T)throws->Any) throws {
@@ -355,27 +369,36 @@ struct EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     public mutating func encode(_ value: String) throws { try encode(value, with: encoder.box(_:)) }
     public mutating func encode(_ value: Float)  throws { try encode(value, with: encoder.box(_:)) }
     public mutating func encode(_ value: Double) throws { try encode(value, with: encoder.box(_:)) }
-    public mutating func encode<T : Encodable>(_ value: T) throws { try encode(value as Encodable, with: encoder.box(_:)) }
     
-    public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
-        
-        let container = NSMutableDictionary()
-        self.container.add(container)
-        
-        return KeyedEncodingContainer(EncoderKeyedContainer<NestedKey>(encoder: self.encoder, container: container, nestedPath: self.nestedPath + ["index \(count)"]))
-    }
+    public mutating func encode<T : Encodable>(_ value: T) throws { try encode(value as Encodable, with: encoder.box(_:)) }
     
     public mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
         
         let container = NSMutableArray()
         self.container.add(container)
         
-        return EncoderUnkeyedContainer(encoder: self.encoder, container: container, nestedPath: self.nestedPath + ["index \(count)"])
+        return Self(encoder: self.encoder, container: container, nestedPath: self.nestedPath + ["index \(count)"])
     }
+}
+
+extension EncoderUnkeyedContainer where Self.KeyedContainer.Base == Self.Base {
     
-    public mutating func superEncoder() -> Encoder {
+    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
+
+        let container = NSMutableDictionary()
+        self.container.add(container)
+        
+        return KeyedContainer.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + ["index \(count)"], keyedBy: NestedKey.self)
+    }
+}
+
+extension EncoderUnkeyedContainer where Self.Reference.Super == Self.Base {
+    
+    mutating func superEncoder() -> Encoder {
+        
         defer { container.add("placeholder") }
-        return EncoderReference(encoder: self.encoder, reference: .unkeyed(self.container, index: container.count), previousPath: self.codingPath) // ["index \(count)"] is added from reference
+        
+        return Reference(encoder: self.encoder, reference: .unkeyed(self.container, index: container.count), previousPath: self.codingPath) // ["index \(count)"] is added from reference
     }
 }
 
@@ -387,17 +410,30 @@ enum EncoderReferenceValue {
 // MARK: - EncoderReference
 /// EncoderReference is a special subclass of EncoderBase which has its own storage, but references the contents of a different encoder.
 /// It's used in superEncoder(), which returns a new encoder for encoding a superclass -- the lifetime of the encoder should not escape the scope it's created in, but it doesn't necessarily know when it's done being used (to write to the original container).
-fileprivate class EncoderReference : EncoderBase {
+protocol EncoderReference : EncoderBase {
     // MARK: Reference types.
     
-    /// The container reference itself.
-    private let reference: EncoderReferenceValue
+    var reference: EncoderReferenceValue {get set}
+    var previousPath: [CodingKey] {get set}
     
-    override var codingPath: [CodingKey] {
+    associatedtype Super: EncoderBase
+    
+    // MARK: - Initialization
+    /// Initializes `self` by referencing the given array container in the given encoder.
+    init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey])
+    
+    
+    // MARK: - Deinitialization
+//    deinit {
+//        willDeinit()
+//    }
+}
+
+extension EncoderReference {
+    
+    var codingPath: [CodingKey] {
         return previousPath + storage.flatMap { $0.key }
     }
-    
-    var previousPath: [CodingKey]
     
     var superKey: CodingKey {
         switch reference {
@@ -406,23 +442,9 @@ fileprivate class EncoderReference : EncoderBase {
         }
     }
     
-    // MARK: - Initialization
-    /// Initializes `self` by referencing the given array container in the given encoder.
-    fileprivate init(encoder: EncoderBase, reference: EncoderReferenceValue, previousPath: [CodingKey]) {
-        
-        self.previousPath = previousPath
-        self.reference = reference
-        
-        super.init(options: encoder.options, userInfo: encoder.userInfo)
-        
-        self.key = superKey
-    }
-    
-    typealias KeyedContainer = EncoderKeyedContainer<String>
-    
     func _key(from key: CodingKey) -> Any {
         
-        if KeyedContainer.usesStringValue {
+        if Self.KeyedContainer.usesStringValue {
             return key.stringValue
         } else {
             guard key.intValue != nil else { fatalError("Tried to get \(key).intValue, but found nil.") }
@@ -430,6 +452,29 @@ fileprivate class EncoderReference : EncoderBase {
         }
     }
     
+    // not supported (would change expected behaviour), but it would be nice.
+    //    override func set(_ encoded: Any) {
+    //
+    //        if self.storage.count > 0 {
+    //
+    //            guard let key = self.removeKey() else {
+    //                super.set(encoded)
+    //                return
+    //            }
+    //
+    //            switch self.reference {
+    //            case .keyed(let container, key: _): container[_key(from: key)] = encoded
+    //            case .unkeyed(let container, index: _): container.add(encoded)
+    //            }
+    //
+    //            super.set(encoded)
+    //
+    //        } else {
+    //            super.set(encoded)
+    //        }
+    //    }
+    
+    // Finalizes `self` by writing the contents of our storage to the reference's storage.
     func willDeinit() {
         
         precondition(storage.count > 0, "Referencing encoder deallocated without encoding any values")
@@ -445,11 +490,17 @@ fileprivate class EncoderReference : EncoderBase {
             dictionary[_key(from: key)] = dictionary[_key(from: key)] ?? value
         }
     }
+}
+
+extension EncoderReference where Super.Options == Self.Options {
     
-    // MARK: - Deinitialization
-    // Finalizes `self` by writing the contents of our storage to the referenced encoder's storage.
-    deinit {
-        willDeinit()
+    init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey]) {
+        
+        self.init(options: encoder.options, userInfo: encoder.userInfo)
+        
+        self.previousPath = previousPath
+        self.reference = reference
+        self.key = superKey
     }
 }
 
