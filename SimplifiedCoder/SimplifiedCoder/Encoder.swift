@@ -20,32 +20,32 @@ protocol TopLevelEncoder {
 
 // MARK: - EncoderBase
 protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
-    // MARK: Properties
-    /// The encoder's storage.
-    var storage: [(key: CodingKey?, value: Any)] {get set}
     
+    // references
+    
+    // warning: references to KeyedContainer<Key> types will compiler crash (Command failed due to signal: Abort trap: 6) if the generic value is left out
+    // default with <String>
     associatedtype KeyedContainer: EncoderKeyedContainer
     associatedtype UnkeyedContainer: EncoderUnkeyedContainer
     associatedtype Options
     
+    // required methods
+    
+    var codingPath: [CodingKey] {get set}
+    
     /// Options set on the top-level encoder.
     var options: Options {get}
-    
-    /// Contextual user-provided information for use during encoding.
     var userInfo: [CodingUserInfoKey : Any] {get}
-    
-    // MARK: - Initialization
-    /// Initializes `self` with the given top-level encoder options.
     init(options: Options, userInfo: [CodingUserInfoKey : Any])
     
+    // storage and key were zipped together to guarantee a single path to any resource
+    // starts with []
+    var storage: [(key: CodingKey?, value: Any)] {get set}
     var key: CodingKey? {get set}
     
-    // new overridable funtions and variables
+    // new methods
     
-    
-    var codingPath: [CodingKey]
-    
-    var canEncodeNewValue: Bool
+    var canEncodeNewValue: Bool {get}
     
     func removeKey() -> CodingKey?
     
@@ -239,24 +239,24 @@ extension EncoderBase where Self.UnkeyedContainer.Base == Self {
 // MARK: - Encoding Containers
 protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     
+    // references
+    
     associatedtype UnkeyedContainer: EncoderUnkeyedContainer
     associatedtype Reference: EncoderReference
     associatedtype Base: EncoderBase
     
-    // MARK: Properties
+    // required methods
+    
     var encoder: Base {get}
     var container: NSMutableDictionary {get}
     var nestedPath: [CodingKey] {get}
-    
-    // MARK: - Initialization
-    /// Initializes `self` with the given references.
     init(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey])
     
     static func initSelf<Key>(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
     
-    // new overridable functions and variables
-    
     static var usesStringValue: Bool {get}
+    
+    // new methods
     
     func _key(from key: CodingKey) -> Any
     
@@ -264,10 +264,6 @@ protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
 }
 
 extension EncoderKeyedContainer {
-    
-    static var usesStringValue: Bool {
-        return true
-    }
     
     public var codingPath: [CodingKey] {
         return encoder.codingPath + nestedPath
@@ -325,7 +321,6 @@ extension EncoderKeyedContainer {
 
 extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
     
-
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
 
         let container = NSMutableArray()
@@ -348,19 +343,22 @@ extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
 
 protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     
+    // references
+    
+    // warning: references to KeyedContainer<Key> types will compiler crash (Command failed due to signal: Abort trap: 6) if the generic value is left out
+    // default with <String>
     associatedtype KeyedContainer: EncoderKeyedContainer
     associatedtype Reference: EncoderReference
     associatedtype Base: EncoderBase
     
+    // required methods
+    
     var encoder: Base {get}
     var container: NSMutableArray {get}
     var nestedPath: [CodingKey] {get}
-    
-    // MARK: - Initialization
-    /// Initializes `self` with the given references.
     init(encoder: Base, container: NSMutableArray, nestedPath: [CodingKey])
     
-    // new overridable functions and variables
+    // new methods
     
     func encode<T>(_ value: T, with box: (T)throws->Any) throws
 }
@@ -443,24 +441,25 @@ enum EncoderReferenceValue {
     case unkeyed(NSMutableArray, index: Int)
 }
 
-// MARK: - EncoderReference
-/// EncoderReference is a special subclass of EncoderBase which has its own storage, but references the contents of a different encoder.
-/// It's used in superEncoder(), which returns a new encoder for encoding a superclass -- the lifetime of the encoder should not escape the scope it's created in, but it doesn't necessarily know when it's done being used (to write to the original container).
 protocol EncoderReference : EncoderBase {
-    // MARK: Reference types.
+    
+    // references
+    
+    associatedtype Super: EncoderBase
+    
+    // required methods
     
     var reference: EncoderReferenceValue {get set}
     var previousPath: [CodingKey] {get set}
     
-    associatedtype Super: EncoderBase
-    
-    // MARK: - Deinitialization
+    // super will not be encoded if willDeinit() is not called
 //    deinit {
 //        willDeinit()
 //    }
     
-    // overridable functions and variables
+    // new methods
     
+    // not required if Super.Options == Self.Options
     init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey])
     
     var codingPath: [CodingKey] {get}
@@ -469,7 +468,7 @@ protocol EncoderReference : EncoderBase {
     
     func _key(from key: CodingKey) -> Any
     
-    // Finalizes `self` by writing the contents of our storage to the reference's storage.
+    /// Finalizes `self` by writing the contents of our storage to the reference's storage.
     func willDeinit()
     
 }
@@ -497,7 +496,7 @@ extension EncoderReference {
         }
     }
     
-    // not supported (would change expected behaviour), but it would be nice.
+    // not supported (would change expected behaviour), but it would be nice. (incomplete)
     //    override func set(_ encoded: Any) {
     //
     //        if self.storage.count > 0 {
@@ -525,7 +524,7 @@ extension EncoderReference {
         precondition(storage.count > 0, "Referencing encoder deallocated without encoding any values")
         precondition(storage.count < 2, "Referencing encoder deallocated with multiple containers on stack.")
         
-        let value = self.storage.removeLast()
+        let value = self.storage.removeLast().value
         
         switch self.reference {
         case .unkeyed(let array, index: let index):

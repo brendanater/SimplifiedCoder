@@ -18,20 +18,25 @@ protocol TopLevelDecoder {
 /// must be a class, so that references reference the same decoder
 protocol DecoderBase: class, Decoder, SingleValueDecodingContainer {
     
+    // references
+    
+    // warning: references to KeyedContainer<Key> types will compiler crash (Command failed due to signal: Abort trap: 6) if the generic value is left out
+    // default with <String>
     associatedtype KeyedContainer: DecoderKeyedContainer
     associatedtype UnkeyedContainer: DecoderUnkeyedContainer
     associatedtype Options
+    
+    // required
     
     var storage: [Any] {get set}
     var options: Options {get}
     var codingPath: [CodingKey] {get set}
     var userInfo: [CodingUserInfoKey : Any] {get}
     
-    // storage = [value] at start
+    /// self.storage = [value]
     init(value: Any, codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any])
     
-    
-    // new overridable functions and variables
+    // new methods
     
     var stringDefaultsToDescription: Bool {get}
     
@@ -275,8 +280,12 @@ extension DecoderBase where UnkeyedContainer.Base == Self {
 
 protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
+    // references
+    
     associatedtype UnkeyedContainer: DecoderUnkeyedContainer
     associatedtype Base: DecoderBase
+    
+    // required
     
     var decoder: Base {get}
     var container: NSDictionary {get}
@@ -286,9 +295,9 @@ protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
     static func initSelf<Key: CodingKey>(decoder: Base, container: NSDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key>
     
-    // new overridable functions and variables
-    
     static var usesStringValue: Bool {get}
+    
+    // new methods
     
     func _key(from key: CodingKey) -> Any
     
@@ -437,6 +446,10 @@ extension DecoderKeyedContainer where UnkeyedContainer.Base == Self.Base {
 
 protocol DecoderUnkeyedContainer: UnkeyedDecodingContainer {
     
+    // references
+    
+    // warning: references to KeyedContainer<Key> types will compiler crash (Command failed due to signal: Abort trap: 6) if the generic value is left out
+    // default with <String>
     associatedtype KeyedContainer: DecoderKeyedContainer
     associatedtype Base: DecoderBase
     
