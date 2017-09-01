@@ -31,8 +31,6 @@ protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     
     // required methods
     
-    var codingPath: [CodingKey] {get set}
-    
     /// Options set on the top-level encoder.
     var options: Options {get}
     var userInfo: [CodingUserInfoKey : Any] {get}
