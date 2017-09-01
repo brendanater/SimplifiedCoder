@@ -534,18 +534,6 @@ extension EncoderReference {
     }
 }
 
-extension EncoderReference where Super.Options == Self.Options {
-    
-    init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey]) {
-        
-        self.init(options: encoder.options, userInfo: encoder.userInfo)
-        
-        self.previousPath = previousPath
-        self.reference = reference
-        self.key = superKey
-    }
-}
-
 /// a wrapping error to associate an unknown error on encode with a codingPath
 enum EncodeError: Error {
     
