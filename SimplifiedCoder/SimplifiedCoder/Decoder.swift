@@ -69,7 +69,7 @@ protocol DecoderBase: class, Decoder, SingleValueDecodingContainer {
     func unbox(_ value: Any) throws -> Float
     func unbox(_ value: Any) throws -> Double
     func unbox(_ value: Any) throws -> String
-    func unbox(_ value: Any) throws -> Decodable
+    func unbox<T: Decodable>(_ value: Any) throws -> T
     
     func redecode<T: Decodable>(_ value: Any) throws -> T
 }
