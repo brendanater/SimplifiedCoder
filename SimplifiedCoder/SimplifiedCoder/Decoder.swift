@@ -11,33 +11,8 @@ import Foundation
 protocol TopLevelDecoder {
     
     func decode<T: Decodable>(_: T.Type, from data: Data) throws -> T
-    func decode<T: Decodable>(_: T.Type, from value: Any) throws -> T
+    func decode<T: Decodable>(_: T.Type, fromValue: Any) throws -> T
 }
-
-struct NumberLossyConversionStrategy: OptionSet {
-    
-    let rawValue: Int
-    
-    static let dontAllow = NumberLossyConversionStrategy(rawValue: 0)
-    /// use Number.init(NSNumber)
-    static let initNSNumber = NumberLossyConversionStrategy(rawValue: 1)
-    /// use Number.init(clamping: Int or UInt)
-    /// float and double default to init(NSNumber)
-    static let clampingIntegers = NumberLossyConversionStrategy(rawValue: 2)
-    /// use Number.init(truncating: NSNumber)
-    static let truncating = NumberLossyConversionStrategy(rawValue: 3)
-
-}
-
-//extension JSONDecoder {
-//    typealias _Options2 = (
-//        dateDecodingStrategy: DateDecodingStrategy,
-//        dataDecodingStrategy: DataDecodingStrategy,
-//        nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy,
-//        numberLossyConversionStrategy: NumberLossyConversionStrategy,
-//        stringDefaultsToDescription: Bool
-//    )
-//}
 
 
 /// must be a class, so that references reference the same decoder
@@ -54,6 +29,44 @@ protocol DecoderBase: class, Decoder, SingleValueDecodingContainer {
     
     // storage = [value] at start
     init(value: Any, codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any])
+    
+    
+    // new overridable functions and variables
+    
+    var stringDefaultsToDescription: Bool {get}
+    
+    func decodeNil() -> Bool
+    
+    func error(_ error: Error, at codingPath: [CodingKey]) -> Error
+    
+    // decides which unbox error to throw based on the value
+    func failedToUnbox<T>(_ value: Any, to type: T.Type, _ typeDescription: String?) -> UnboxError
+    
+    func notFound<T>(_ type: T.Type, _ typeDescription: String?) -> UnboxError
+    func typeError<T>(_ value: Any, _ type: T.Type, _ typeDescription: String?) -> UnboxError
+    func corrupted(_ debugDescription: String) -> UnboxError
+    
+    func decode<T>(with unbox: (Any)throws->T) throws -> T
+    
+    func convert<T: ConvertibleNumber>(number value: Any) throws -> T
+    
+    func unbox(_ value: Any) throws -> Bool
+    func unbox(_ value: Any) throws -> Int
+    func unbox(_ value: Any) throws -> Int8
+    func unbox(_ value: Any) throws -> Int16
+    func unbox(_ value: Any) throws -> Int32
+    func unbox(_ value: Any) throws -> Int64
+    func unbox(_ value: Any) throws -> UInt
+    func unbox(_ value: Any) throws -> UInt8
+    func unbox(_ value: Any) throws -> UInt16
+    func unbox(_ value: Any) throws -> UInt32
+    func unbox(_ value: Any) throws -> UInt64
+    func unbox(_ value: Any) throws -> Float
+    func unbox(_ value: Any) throws -> Double
+    func unbox(_ value: Any) throws -> String
+    func unbox(_ value: Any) throws -> Decodable
+    
+    func redecode<T: Decodable>(_ value: Any) throws -> T
 }
 
 extension DecoderBase {
@@ -110,6 +123,16 @@ extension DecoderBase {
     
     // MARK: unbox
     
+    /// an error to throw if unboxing fails
+    func failedToUnbox<T>(_ value: Any, to type: T.Type, _ typeDescription: String? = nil) -> UnboxError {
+        
+        if isNil(value) {
+            return notFound(type, typeDescription)
+        } else {
+            return typeError(value, type, typeDescription)
+        }
+    }
+    
     func notFound<T>(_ type: T.Type, _ typeDescription: String? = nil) -> UnboxError {
         
         let typeDescription = typeDescription ?? "\(T.self)"
@@ -132,16 +155,6 @@ extension DecoderBase {
                 debugDescription: "Expected to decode \(typeDescription), but found \(value)"
             )
         )
-    }
-    
-    /// an error to throw if unboxing fails
-    func failedToUnbox<T>(_ value: Any, to type: T.Type, _ typeDescription: String? = nil) -> UnboxError {
-        
-        if isNil(value) {
-            return notFound(type, typeDescription)
-        } else {
-            return typeError(value, type, typeDescription)
-        }
     }
     
     func corrupted(_ debugDescription: String) -> UnboxError {
@@ -198,6 +211,7 @@ extension DecoderBase {
     func unbox<T : Decodable>(_ value: Any) throws -> T {
         return try redecode(value)
 //        switch T.self {
+//        case is Date: return try unbox(value) as Date
 //        default: return try redecode(value)
 //        }
     }
@@ -272,8 +286,15 @@ protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
     static func initSelf<Key: CodingKey>(decoder: Base, container: NSDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key>
     
+    // new overridable functions and variables
+    
     static var usesStringValue: Bool {get}
     
+    func _key(from key: CodingKey) -> Any
+    
+    func value(forKey key: CodingKey) throws -> Any
+    
+    func decode<T>(with unbox: (Any)throws->T, forKey key: Key) throws -> T
 }
 
 extension DecoderKeyedContainer {
@@ -426,6 +447,14 @@ protocol DecoderUnkeyedContainer: UnkeyedDecodingContainer {
     init(decoder: Base, container: NSArray, nestedPath: [CodingKey])
     
     var currentIndex: Int {get set}
+    
+    // new overridable functions and variables
+    
+    var currentKey: CodingKey {get}
+    
+    mutating func next<T>(_ type: T.Type, _ typeDescription: String?) throws -> Any
+    
+    mutating func decode<T>(with unbox: (Any)throws->T) throws -> T
 }
 
 extension DecoderUnkeyedContainer {
@@ -628,40 +657,5 @@ extension UInt32: ConvertibleInteger {}
 extension UInt64: ConvertibleInteger {}
 extension Float : ConvertibleNumber {}
 extension Double: ConvertibleNumber {}
-
-protocol CanBeNil {
-    var isNil: Bool {get}
-}
-
-extension NSNull: CanBeNil { var isNil: Bool { return true } }
-extension Optional: CanBeNil {
-    var isNil: Bool {
-        if case .some(let wrapped) = self {
-            if let canBeNil = wrapped as? CanBeNil {
-                return canBeNil.isNil
-            } else {
-                return false
-            }
-        } else {
-            return true
-        }
-    }
-}
-
-func isNil(_ value: Any?) -> Bool {
-    return value.isNil
-}
-
-extension NumberFormatter {
-    static var shared = NumberFormatter()
-}
-
-extension ISO8601DateFormatter {
-    static let shared: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = .withInternetDateTime
-        return formatter
-    }()
-}
 
 

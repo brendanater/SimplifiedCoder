@@ -18,16 +18,6 @@ protocol TopLevelEncoder {
     func encode(asValue value: Encodable) throws -> Any
 }
 
-
-extension JSONEncoder {
-    fileprivate typealias _Options = (
-        dateEncodingStrategy: DateEncodingStrategy,
-        dataEncodingStrategy: DataEncodingStrategy,
-        nonConformingFloatEncodingStrategy: NonConformingFloatEncodingStrategy,
-        userInfo: [CodingUserInfoKey : Any]
-    )
-}
-
 // MARK: - EncoderBase
 protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     // MARK: Properties
@@ -49,6 +39,38 @@ protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     init(options: Options, userInfo: [CodingUserInfoKey : Any])
     
     var key: CodingKey? {get set}
+    
+    // new overridable funtions and variables
+    
+    
+    var codingPath: [CodingKey]
+    
+    var canEncodeNewValue: Bool
+    
+    func removeKey() -> CodingKey?
+    
+    func set(_ encoded: Any)
+    
+    func encode<T>(_ value: T, with box: (T)throws->Any) throws
+    
+    func box(_ value: Void  ) throws -> Any
+    func box(_ value: Bool  ) throws -> Any
+    func box(_ value: Int   ) throws -> Any
+    func box(_ value: Int8  ) throws -> Any
+    func box(_ value: Int16 ) throws -> Any
+    func box(_ value: Int32 ) throws -> Any
+    func box(_ value: Int64 ) throws -> Any
+    func box(_ value: UInt  ) throws -> Any
+    func box(_ value: UInt8 ) throws -> Any
+    func box(_ value: UInt16) throws -> Any
+    func box(_ value: UInt32) throws -> Any
+    func box(_ value: UInt64) throws -> Any
+    func box(_ value: Float ) throws -> Any
+    func box(_ value: Double) throws -> Any
+    func box(_ value: String) throws -> Any
+    func box(_ value: Encodable) throws -> Any
+    
+    func reencode(_ value: Encodable) throws -> Any
 }
 
 extension EncoderBase {
@@ -132,9 +154,9 @@ extension EncoderBase {
     func box(_ value: String) throws -> Any { return value }
     
     func box(_ value: Encodable) throws -> Any {
-        
+
         return try reencode(value)
-        
+
         //        switch value {
         //        case is Date: return try box(value as Date)
         //        case is URL: return try box(value as URL)
@@ -226,16 +248,26 @@ protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     var container: NSMutableDictionary {get}
     var nestedPath: [CodingKey] {get}
     
-    static var usesStringValue: Bool {get}
-    
     // MARK: - Initialization
     /// Initializes `self` with the given references.
     init(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey])
     
     static func initSelf<Key>(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
+    
+    // new overridable functions and variables
+    
+    static var usesStringValue: Bool {get}
+    
+    func _key(from key: CodingKey) -> Any
+    
+    func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws
 }
 
 extension EncoderKeyedContainer {
+    
+    static var usesStringValue: Bool {
+        return true
+    }
     
     public var codingPath: [CodingKey] {
         return encoder.codingPath + nestedPath
@@ -315,7 +347,7 @@ extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
 }
 
 protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
-    // MARK: Properties
+    
     associatedtype KeyedContainer: EncoderKeyedContainer
     associatedtype Reference: EncoderReference
     associatedtype Base: EncoderBase
@@ -327,6 +359,10 @@ protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     // MARK: - Initialization
     /// Initializes `self` with the given references.
     init(encoder: Base, container: NSMutableArray, nestedPath: [CodingKey])
+    
+    // new overridable functions and variables
+    
+    func encode<T>(_ value: T, with box: (T)throws->Any) throws
 }
 
 extension EncoderUnkeyedContainer {
@@ -418,15 +454,24 @@ protocol EncoderReference : EncoderBase {
     
     associatedtype Super: EncoderBase
     
-    // MARK: - Initialization
-    /// Initializes `self` by referencing the given array container in the given encoder.
-    init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey])
-    
-    
     // MARK: - Deinitialization
 //    deinit {
 //        willDeinit()
 //    }
+    
+    // overridable functions and variables
+    
+    init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey])
+    
+    var codingPath: [CodingKey] {get}
+    
+    var superKey: CodingKey {get}
+    
+    func _key(from key: CodingKey) -> Any
+    
+    // Finalizes `self` by writing the contents of our storage to the reference's storage.
+    func willDeinit()
+    
 }
 
 extension EncoderReference {
