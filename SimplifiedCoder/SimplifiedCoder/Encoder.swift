@@ -152,9 +152,9 @@ extension EncoderBase {
     func box(_ value: String) throws -> Any { return value }
     
     func box(_ value: Encodable) throws -> Any {
-
+        
         return try reencode(value)
-
+        
         //        switch value {
         //        case is Date: return try box(value as Date)
         //        case is URL: return try box(value as URL)
@@ -184,19 +184,22 @@ extension EncoderBase {
 extension EncoderBase where Self.KeyedContainer.Base == Self {
     // MARK: - Encoder Methods
     func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
+        
+        typealias C = KeyedContainer.Container
+        
         // If an existing keyed container was already requested, return that one.
-        let container: NSMutableDictionary
-
+        let container: C
+        
         if self.canEncodeNewValue {
-
-            container = NSMutableDictionary()
-
+            
+            container = C()
+            
             set(container)
-
+            
         } else {
             // could just crash here, but checks if the last encoded container is the same type and returns that.
-
-            if let _container = self.storage.last!.value as? NSMutableDictionary {
+            
+            if let _container = self.storage.last!.value as? C {
                 container = _container
             } else {
                 preconditionFailure("Attempt to push new keyed encoding container when already previously encoded at this path.")
@@ -211,28 +214,37 @@ extension EncoderBase where Self.UnkeyedContainer.Base == Self {
     
     func unkeyedContainer() -> UnkeyedEncodingContainer {
         
-        let container: NSMutableArray
-
+        typealias C = UnkeyedContainer.Container
+        
+        let container: C
+        
         if self.canEncodeNewValue {
-
-            container = NSMutableArray()
-
+            
+            container = C()
+            
             set(container)
-
+            
         } else {
             // could just crash here, but checks if the last encoded container is the same type and returns that.
             
-            if let _container = self.storage.last!.value as? NSMutableArray {
+            if let _container = self.storage.last!.value as? C {
                 container = _container
             } else {
                 preconditionFailure("Attempt to push new unkeyed encoding container when already previously encoded at this path.")
             }
         }
-
+        
         return UnkeyedContainer(encoder: self, container: container, nestedPath: [])
     }
-
+    
 }
+
+protocol EncoderKeyedContainerType: class {
+    subscript(key: Any) -> Any? {get set}
+    init()
+}
+
+extension NSMutableDictionary: EncoderKeyedContainerType {}
 
 // MARK: - Encoding Containers
 protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
@@ -242,15 +254,16 @@ protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     associatedtype UnkeyedContainer: EncoderUnkeyedContainer
     associatedtype Reference: EncoderReference
     associatedtype Base: EncoderBase
+    associatedtype Container: EncoderKeyedContainerType = NSMutableDictionary
     
     // required methods
     
     var encoder: Base {get}
-    var container: NSMutableDictionary {get}
+    var container: Container {get}
     var nestedPath: [CodingKey] {get}
-    init(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey])
+    init(encoder: Base, container: Container, nestedPath: [CodingKey])
     
-    static func initSelf<Key>(encoder: Base, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
+    static func initSelf<Key>(encoder: Base, container: Container, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
     
     static var usesStringValue: Bool {get}
     
@@ -310,7 +323,7 @@ extension EncoderKeyedContainer {
     
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         
-        let container = NSMutableDictionary()
+        let container = Container()
         self.container[_key(from: key)] = container
         
         return Self.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key], keyedBy: NestedKey.self)
@@ -320,24 +333,33 @@ extension EncoderKeyedContainer {
 extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
     
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-
-        let container = NSMutableArray()
+        
+        let container = UnkeyedContainer.Container()
         self.container[_key(from: key)] = container
-
+        
         return UnkeyedContainer(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key])
     }
 }
 
 extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
-
+    
     mutating func superEncoder() -> Encoder {
         return Reference(encoder: self.encoder, reference: .keyed(self.container, key: "super"), previousPath: self.codingPath) // [key] is added from reference
     }
-
+    
     mutating func superEncoder(forKey key: Key) -> Encoder {
         return Reference(encoder: self.encoder, reference: .keyed(self.container, key: key), previousPath: self.codingPath)
     }
 }
+
+protocol EncoderUnkeyedContainerType: class {
+    var count: Int {get}
+    func add(_ value: Any)
+    init()
+    func replaceObject(at index: Int, with object: Any)
+}
+
+extension NSMutableArray: EncoderUnkeyedContainerType {}
 
 protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     
@@ -348,13 +370,14 @@ protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     associatedtype KeyedContainer: EncoderKeyedContainer
     associatedtype Reference: EncoderReference
     associatedtype Base: EncoderBase
+    associatedtype Container: EncoderUnkeyedContainerType = NSMutableArray
     
     // required methods
     
     var encoder: Base {get}
-    var container: NSMutableArray {get}
+    var container: Container {get}
     var nestedPath: [CodingKey] {get}
-    init(encoder: Base, container: NSMutableArray, nestedPath: [CodingKey])
+    init(encoder: Base, container: Container, nestedPath: [CodingKey])
     
     // new methods
     
@@ -406,7 +429,7 @@ extension EncoderUnkeyedContainer {
     
     public mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
         
-        let container = NSMutableArray()
+        let container = Container()
         self.container.add(container)
         
         return Self(encoder: self.encoder, container: container, nestedPath: self.nestedPath + ["index \(count)"])
@@ -416,8 +439,8 @@ extension EncoderUnkeyedContainer {
 extension EncoderUnkeyedContainer where Self.KeyedContainer.Base == Self.Base {
     
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
-
-        let container = NSMutableDictionary()
+        
+        let container = KeyedContainer.Container()
         self.container.add(container)
         
         return KeyedContainer.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + ["index \(count)"], keyedBy: NestedKey.self)
@@ -435,8 +458,8 @@ extension EncoderUnkeyedContainer where Self.Reference.Super == Self.Base {
 }
 
 enum EncoderReferenceValue {
-    case keyed(NSMutableDictionary, key: CodingKey)
-    case unkeyed(NSMutableArray, index: Int)
+    case keyed(EncoderKeyedContainerType, key: CodingKey)
+    case unkeyed(EncoderUnkeyedContainerType, index: Int)
 }
 
 protocol EncoderReference : EncoderBase {
@@ -451,9 +474,9 @@ protocol EncoderReference : EncoderBase {
     var previousPath: [CodingKey] {get set}
     
     // super will not be encoded if willDeinit() is not called
-//    deinit {
-//        willDeinit()
-//    }
+    //    deinit {
+    //        willDeinit()
+    //    }
     
     // new methods
     
@@ -563,4 +586,3 @@ enum EncodeError: Error {
         }
     }
 }
-
