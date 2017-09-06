@@ -332,7 +332,7 @@ protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
     func value(forKey key: CodingKey) throws -> Any
     
-    func optionalValue(forKey key: CodingKey) -> Any
+    func optionalValue(forKey key: CodingKey) -> Any?
     
     func decode<T>(with unbox: (Any)throws->T, forKey key: Key) throws -> T
 }
