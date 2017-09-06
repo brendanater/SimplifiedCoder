@@ -293,11 +293,17 @@ extension NSDictionary: DecoderKeyedContainerType {
         get {
             return self[key]
         }
+        set {
+            
+        }
     }
     
     subscript(key: Int) -> Any? {
         get {
             return self[key]
+        }
+        set {
+            
         }
     }
 }
