@@ -353,11 +353,11 @@ extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
 extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
     
     mutating func superEncoder() -> Encoder {
-        return Reference(encoder: self.encoder, reference: .keyed(self.container, key: "super"), previousPath: self.codingPath) // [key] is added from reference
+        return Reference(encoder: self.encoder, reference: .keyed(self.container, key: "super"), previousPath: self.codingPath + ["super"])
     }
     
     mutating func superEncoder(forKey key: Key) -> Encoder {
-        return Reference(encoder: self.encoder, reference: .keyed(self.container, key: key), previousPath: self.codingPath)
+        return Reference(encoder: self.encoder, reference: .keyed(self.container, key: key), previousPath: self.codingPath + [key])
     }
 }
 
@@ -462,7 +462,7 @@ extension EncoderUnkeyedContainer where Self.Reference.Super == Self.Base {
         
         defer { container.add("placeholder") }
         
-        return Reference(encoder: self.encoder, reference: .unkeyed(self.container, index: container.count), previousPath: self.codingPath) // ["index \(count)"] is added from reference
+        return Reference(encoder: self.encoder, reference: .unkeyed(self.container, index: container.count), previousPath: self.codingPath + ["super \(count)"])
     }
 }
 
@@ -494,8 +494,6 @@ protocol EncoderReference : EncoderBase {
     
     var codingPath: [CodingKey] {get}
     
-    var superKey: CodingKey {get}
-    
     /// Finalizes `self` by writing the contents of our storage to the reference's storage.
     func willDeinit()
     
@@ -505,13 +503,6 @@ extension EncoderReference {
     
     var codingPath: [CodingKey] {
         return previousPath + storage.flatMap { $0.key }
-    }
-    
-    var superKey: CodingKey {
-        switch reference {
-        case .keyed(_, key: let key): return key
-        case .unkeyed(_, index: let index): return "index \(index)"
-        }
     }
     
     // not supported (would change expected behaviour), but it would be nice. (incomplete)
@@ -570,7 +561,6 @@ extension EncoderReference where Super.Options == Self.Options {
         
         self.previousPath = previousPath
         self.reference = reference
-        self.key = superKey
     }
 }
 
