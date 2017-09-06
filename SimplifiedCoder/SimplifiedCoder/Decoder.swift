@@ -213,24 +213,24 @@ extension DecoderBase {
         throw failedToUnbox(value, to: String.self)
     }
     
-    func unbox<T : Decodable>(_ value: Any) throws -> T {
+    func unbox<T: Decodable>(_ value: Any) throws -> T {
         return try redecode(value)
-//        switch T.self {
-//        case is Date: return try unbox(value) as Date
-//        default: return try redecode(value)
-//        }
+        //        switch T.self {
+        //        case is Date: return try unbox(value) as Date
+        //        default: return try redecode(value)
+        //        }
     }
     
     func redecode<T: Decodable>(_ value: Any) throws -> T {
         
-        // use this value to decode from (same as creating a new decoder)
+        // decoder now uses this value to decode from (same as creating a new decoder)
         self.storage.append(value)
         let decoded = try T(from: self)
         // not decoding with this value anymore (same as manually deinitializing the new decoder)
         self.storage.removeLast()
         return decoded
     }
-
+    
     public func singleValueContainer() throws -> SingleValueDecodingContainer {
         return self
     }
@@ -238,12 +238,12 @@ extension DecoderBase {
 }
 
 extension DecoderBase where KeyedContainer.Base == Self {
-
+    
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
-
+        
         let value = storage.last as Any
-
-        guard let container = value as? NSDictionary else {
+        
+        guard let container = value as? KeyedContainer.Container else {
             throw failedToUnbox(value, to: KeyedDecodingContainer<Key>.self, "keyed container")
                 .asDecodingError(with: codingPath)
         }
@@ -258,16 +258,16 @@ extension DecoderBase where KeyedContainer.Base == Self {
 }
 
 extension DecoderBase where UnkeyedContainer.Base == Self {
-
+    
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-
+        
         let value = storage.last as Any
-
-        guard let container = value as? NSArray else {
+        
+        guard let container = value as? UnkeyedContainer.Container else {
             throw failedToUnbox(value, to: UnkeyedDecodingContainer.self, "unkeyed container")
                 .asDecodingError(with: codingPath)
         }
-
+        
         return UnkeyedContainer(
             decoder: self,
             container: container,
@@ -278,22 +278,30 @@ extension DecoderBase where UnkeyedContainer.Base == Self {
 
 // MARK: KeyedContainer
 
+protocol DecoderKeyedContainerType {
+    subscript(key: Any) -> Any? {get}
+    var allKeys: [Any] {get}
+}
+
+extension NSDictionary: DecoderKeyedContainerType {}
+
 protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
     // references
     
     associatedtype UnkeyedContainer: DecoderUnkeyedContainer
     associatedtype Base: DecoderBase
+    associatedtype Container: DecoderKeyedContainerType = NSDictionary
     
     // required
     
     var decoder: Base {get}
-    var container: NSDictionary {get}
+    var container: Container {get}
     var nestedPath: [CodingKey] {get}
     
-    init(decoder: Base, container: NSDictionary, nestedPath: [CodingKey])
+    init(decoder: Base, container: Container, nestedPath: [CodingKey])
     
-    static func initSelf<Key: CodingKey>(decoder: Base, container: NSDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key>
+    static func initSelf<Key: CodingKey>(decoder: Base, container: Container, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key>
     
     static var usesStringValue: Bool {get}
     
@@ -391,10 +399,10 @@ extension DecoderKeyedContainer {
     public func decode<T: Decodable>(_ type: T.Type, forKey key: Key)throws->T{ return try decode(with: decoder.unbox(_:), forKey: key) }
     
     public func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
-
+        
         let value = try self.value(forKey: key)
-
-        guard let container = value as? NSDictionary else {
+        
+        guard let container = value as? Container else {
             throw decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
                 .asDecodingError(with: codingPath + [key])
         }
@@ -403,9 +411,9 @@ extension DecoderKeyedContainer {
     }
     
     private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
-
+        
         let value = try? self.value(forKey: key)
-
+        
         return Base(
             value: value ?? NSNull(),
             codingPath: codingPath + [key],
@@ -413,11 +421,11 @@ extension DecoderKeyedContainer {
             userInfo: decoder.userInfo
         )
     }
-
+    
     public func superDecoder() throws -> Decoder {
         return try _superDecoder(forKey: "super")
     }
-
+    
     public func superDecoder(forKey key: Key) throws -> Decoder {
         return try _superDecoder(forKey: key)
     }
@@ -426,14 +434,14 @@ extension DecoderKeyedContainer {
 extension DecoderKeyedContainer where UnkeyedContainer.Base == Self.Base {
     
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
-
+        
         let value = try self.value(forKey: key)
-
-        guard let container = value as? NSArray else {
+        
+        guard let container = value as? UnkeyedContainer.Container else {
             throw decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container")
                 .asDecodingError(with: codingPath + [key])
         }
-
+        
         return UnkeyedContainer(
             decoder: decoder,
             container: container,
@@ -444,6 +452,13 @@ extension DecoderKeyedContainer where UnkeyedContainer.Base == Self.Base {
 
 // MARK: UnkeyedContainer
 
+protocol DecoderUnkeyedContainerType {
+    subscript(index: Int) -> Any {get}
+    var count: Int {get}
+}
+
+extension NSArray: DecoderUnkeyedContainerType {}
+
 protocol DecoderUnkeyedContainer: UnkeyedDecodingContainer {
     
     // references
@@ -452,12 +467,15 @@ protocol DecoderUnkeyedContainer: UnkeyedDecodingContainer {
     // default with <String>
     associatedtype KeyedContainer: DecoderKeyedContainer
     associatedtype Base: DecoderBase
+    associatedtype Container: DecoderUnkeyedContainerType = NSArray
+    
+    // required
     
     var decoder: Base {get}
-    var container: NSArray {get}
+    var container: Container {get}
     var nestedPath: [CodingKey] {get}
     
-    init(decoder: Base, container: NSArray, nestedPath: [CodingKey])
+    init(decoder: Base, container: Container, nestedPath: [CodingKey])
     
     var currentIndex: Int {get set}
     
@@ -490,7 +508,6 @@ extension DecoderUnkeyedContainer {
     public mutating func decodeNil() throws -> Bool {
         
         // will decode a null value, be sure to increment path.
-        // it shouldn't matter to add to currentIndex greater than count
         defer { self.currentIndex += 1 }
         
         return self.isAtEnd || isNil(container[currentIndex])
@@ -552,14 +569,14 @@ extension DecoderUnkeyedContainer {
     
     
     public mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
-
+        
         let value = try next(UnkeyedDecodingContainer.self, "nested unkeyed container")
-
-        guard let container = value as? NSArray else {
+        
+        guard let container = value as? Container else {
             throw decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container")
                 .asDecodingError(with: codingPath + [currentKey])
         }
-
+        
         return Self.init(
             decoder: decoder,
             container: container,
@@ -581,14 +598,14 @@ extension DecoderUnkeyedContainer {
 extension DecoderUnkeyedContainer where KeyedContainer.Base == Self.Base {
     
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
-
+        
         let value = try next(KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
-
-        guard let container = value as? NSDictionary else {
+        
+        guard let container = value as? KeyedContainer.Container else {
             throw decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
                 .asDecodingError(with: codingPath + [currentKey])
         }
-
+        
         return KeyedContainer.initSelf(
             decoder: decoder,
             container: container,
@@ -670,5 +687,3 @@ extension UInt32: ConvertibleInteger {}
 extension UInt64: ConvertibleInteger {}
 extension Float : ConvertibleNumber {}
 extension Double: ConvertibleNumber {}
-
-
