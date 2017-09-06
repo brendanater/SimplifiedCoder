@@ -279,11 +279,34 @@ extension DecoderBase where UnkeyedContainer.Base == Self {
 // MARK: KeyedContainer
 
 protocol DecoderKeyedContainerType {
-    subscript(key: Any) -> Any? {get}
+    
+    subscript(key: String) -> Any? {get set}
+    
+    subscript(key: Int) -> Any? {get set}
+    
     var allKeys: [Any] {get}
 }
 
-extension NSDictionary: DecoderKeyedContainerType {}
+extension NSDictionary: DecoderKeyedContainerType {
+    
+    subscript(key: String) -> Any? {
+        get {
+            return self[key]
+        }
+        set {
+            self[key] = newValue
+        }
+    }
+    
+    subscript(key: Int) -> Any? {
+        get {
+            return self[key]
+        }
+        set {
+            self[key] = newValue
+        }
+    }
+}
 
 protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
@@ -307,9 +330,9 @@ protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
     // new methods
     
-    func _key(from key: CodingKey) -> Any
-    
     func value(forKey key: CodingKey) throws -> Any
+    
+    func optionalValue(forKey key: CodingKey) -> Any
     
     func decode<T>(with unbox: (Any)throws->T, forKey key: Key) throws -> T
 }
@@ -335,41 +358,53 @@ extension DecoderKeyedContainer {
         }
     }
     
-    func _key(from key: CodingKey) -> Any {
+    func value(forKey key: CodingKey) throws -> Any {
         
         if Self.usesStringValue {
-            return key.stringValue
+            
+            guard let value = self.container[key.stringValue] else {
+                throw DecodingError.keyNotFound(
+                    key,
+                    DecodingError.Context(
+                        codingPath: codingPath + [key],
+                        debugDescription: "No value found for key \(key) (\(key.stringValue))."
+                    )
+                )
+            }
+            
+            return value
             
         } else {
+            
             precondition(key.intValue != nil, "Tried to get intValue for key: \(key) in KeyedDecodingContainer<\(Key.self)>, but found nil.")
-            return key.intValue!
+            
+            guard let value = self.container[key.intValue!] else {
+                throw DecodingError.keyNotFound(
+                    key,
+                    DecodingError.Context(
+                        codingPath: codingPath + [key],
+                        debugDescription: "No value found for key \(key) (\(key.intValue!))."
+                    )
+                )
+            }
+            
+            return value
         }
     }
     
-    func value(forKey key: CodingKey) throws -> Any {
-        
-        let _key = self._key(from: key)
-        
-        guard let value = self.container[_key] else {
-            throw DecodingError.keyNotFound(
-                key,
-                DecodingError.Context(
-                    codingPath: codingPath + [key],
-                    debugDescription: "No value found for key \(key) (\(_key))."
-                )
-            )
-        }
-        
-        return value
+    func optionalValue(forKey key: CodingKey) -> Any? {
+        let _value = try? value(forKey: key)
+        return _value
     }
     
     public func contains(_ key: Key) -> Bool {
         
-        return container[_key(from: key)] != nil
+        return optionalValue(forKey: key) != nil
     }
     
     public func decodeNil(forKey key: Key) throws -> Bool {
         
+        // throw if key not found
         return try isNil(value(forKey: key))
     }
     
@@ -464,7 +499,7 @@ protocol DecoderUnkeyedContainer: UnkeyedDecodingContainer {
     // references
     
     // warning: references to KeyedContainer<Key> types will compiler crash (Command failed due to signal: Abort trap: 6) if the generic value is left out
-    // default with <String>
+    // default with <CodingKey> (<String>)
     associatedtype KeyedContainer: DecoderKeyedContainer
     associatedtype Base: DecoderBase
     associatedtype Container: DecoderUnkeyedContainerType = NSArray

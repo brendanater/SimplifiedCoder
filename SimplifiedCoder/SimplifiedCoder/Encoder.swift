@@ -239,8 +239,10 @@ extension EncoderBase where Self.UnkeyedContainer.Base == Self {
     
 }
 
+/// has to be a class to set the value to a central object
 protocol EncoderKeyedContainerType: class {
-    subscript(key: Any) -> Any? {get set}
+    subscript(key: String) -> Any? {get set}
+    subscript(key: Int) -> Any? {get set}
     init()
 }
 
@@ -269,7 +271,7 @@ protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     
     // new methods
     
-    func _key(from key: CodingKey) -> Any
+    func set(_ encoded: Any, forKey key: CodingKey)
     
     func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws
 }
@@ -280,20 +282,25 @@ extension EncoderKeyedContainer {
         return encoder.codingPath + nestedPath
     }
     
-    func _key(from key: CodingKey) -> Any {
+    func set(_ encoded: Any, forKey key: CodingKey) {
         
         if Self.usesStringValue {
-            return key.stringValue
+            
+            self.container[key.stringValue] = encoded
+            
         } else {
-            guard key.intValue != nil else { fatalError("Tried to get \(key).intValue, but found nil.") }
-            return key.intValue!
+            
+            precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
+            
+            self.container[key.intValue!] = encoded
         }
     }
     
     func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws {
         
         do {
-            try self.container[_key(from: key)] = box(value)
+            
+            try set(box(value), forKey: key)
             
         } catch let error as EncodeError {
             throw error
@@ -324,7 +331,8 @@ extension EncoderKeyedContainer {
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         
         let container = Container()
-        self.container[_key(from: key)] = container
+        
+        set(container, forKey: key)
         
         return Self.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key], keyedBy: NestedKey.self)
     }
@@ -335,7 +343,8 @@ extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
         
         let container = UnkeyedContainer.Container()
-        self.container[_key(from: key)] = container
+        
+        set(container, forKey: key)
         
         return UnkeyedContainer(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key])
     }
@@ -487,8 +496,6 @@ protocol EncoderReference : EncoderBase {
     
     var superKey: CodingKey {get}
     
-    func _key(from key: CodingKey) -> Any
-    
     /// Finalizes `self` by writing the contents of our storage to the reference's storage.
     func willDeinit()
     
@@ -504,16 +511,6 @@ extension EncoderReference {
         switch reference {
         case .keyed(_, key: let key): return key
         case .unkeyed(_, index: let index): return "index \(index)"
-        }
-    }
-    
-    func _key(from key: CodingKey) -> Any {
-        
-        if Self.KeyedContainer.usesStringValue {
-            return key.stringValue
-        } else {
-            guard key.intValue != nil else { fatalError("Tried to get \(key).intValue, but found nil.") }
-            return key.intValue!
         }
     }
     
@@ -548,11 +545,19 @@ extension EncoderReference {
         let value = self.storage.removeLast().value
         
         switch self.reference {
-        case .unkeyed(let array, index: let index):
-            array.replaceObject(at: index, with: value)
+        case .unkeyed(let container, index: let index):
+            container.replaceObject(at: index, with: value)
             
-        case .keyed(let dictionary, key: let key):
-            dictionary[_key(from: key)] = dictionary[_key(from: key)] ?? value
+        case .keyed(let container, key: let key):
+            
+            if Self.KeyedContainer.usesStringValue {
+                container[key.stringValue] = container[key.stringValue] ?? value
+            } else {
+                precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
+                
+                container[key.intValue!] = container[key.intValue!] ?? value
+            }
+            
         }
     }
 }
