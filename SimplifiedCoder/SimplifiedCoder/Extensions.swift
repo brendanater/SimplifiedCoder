@@ -3,7 +3,7 @@
 //  SimplifiedCoder
 //
 //  Created by Brendan Henderson on 8/31/17.
-//  Copyright © 2017 OKAY. All rights reserved.
+//  Copyright © 2017 OKAY.
 //
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy

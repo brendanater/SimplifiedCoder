@@ -2,8 +2,8 @@
 //  Decoder.swift
 //  SimplifiedCoder
 //
-//  Created by Christopher Bryan Henderson on 8/27/17.
-//  Copyright © 2017 OKAY. All rights reserved.
+//  Created by Brendan Henderson on 8/27/17.
+//  Copyright © 2017 OKAY. 
 //
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
