@@ -280,9 +280,9 @@ extension DecoderBase where UnkeyedContainer.Base == Self {
 
 protocol DecoderKeyedContainerType {
     
-    subscript(key: String) -> Any? {get}
+    subscript(key: String) -> Any? {get set}
     
-    subscript(key: Int) -> Any? {get}
+    subscript(key: Int) -> Any? {get set}
     
     var allKeys: [Any] {get}
 }
@@ -294,7 +294,7 @@ extension NSDictionary: DecoderKeyedContainerType {
             return self[key]
         }
         set {
-            
+            self[key] = newValue
         }
     }
     
@@ -303,7 +303,7 @@ extension NSDictionary: DecoderKeyedContainerType {
             return self[key]
         }
         set {
-            
+            self[key] = newValue
         }
     }
 }
