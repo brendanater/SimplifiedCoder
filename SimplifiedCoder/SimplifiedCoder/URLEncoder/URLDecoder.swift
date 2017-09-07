@@ -208,10 +208,10 @@ public struct URLDecoder: TopLevelDecoder {
         func unbox<T : Decodable>(_ value: Any) throws -> T {
 
             switch T.self {
-            case is Date.Type:    return try unbox(value) as Date    as! T
-            case is Data.Type:    return try unbox(value) as Data    as! T
-            case is URL.Type:     return try unbox(value) as URL     as! T
-            case is Decimal.Type: return try unbox(value) as Decimal as! T
+            case is Date.Type:    return try self.unbox(value) as Date    as! T
+            case is Data.Type:    return try self.unbox(value) as Data    as! T
+            case is URL.Type:     return try self.unbox(value) as URL     as! T
+            case is Decimal.Type: return try self.unbox(value) as Decimal as! T
             default: return try self.redecode(value)
             }
         }
@@ -264,42 +264,6 @@ public struct URLDecoder: TopLevelDecoder {
         
     }
 }
-
-
-
-//fileprivate struct _OrderedDictionary: OrderedDictionaryProtocol, DecoderKeyedContainerType {
-//
-//    typealias Key = AnyHashable
-//    typealias Value = Any
-//
-//    typealias Element = (key: Key, value: Value)
-//
-//    var elements: [(key: AnyHashable, value: Any)]
-//
-//    init() {
-//        self.elements = []
-//    }
-//
-//    init(_ elements: [Element]) {
-//        self.elements = elements
-//    }
-//
-//    var allKeys: [Any] {
-//        return elements.map { $0.key }
-//    }
-//
-//    subscript(key: AnyHashable) -> Any? {
-//        get {
-//            return self.getValue(forKey: key)
-//        }
-//        set {
-//            self.replaceOrAppendValue(forKey: key, with: newValue)
-//        }
-//    }
-//}
-
-
-
 
 
 

@@ -86,23 +86,23 @@ public protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     func reencode(_ value: Encodable) throws -> Any
 }
 
-extension EncoderBase {
+public extension EncoderBase {
     
     /// The path to the current point in encoding.
     public var codingPath: [CodingKey] {
         return self.storage.flatMap { $0.key }
     }
     
-    var canEncodeNewValue: Bool {
+    public var canEncodeNewValue: Bool {
         return self.key != nil || self.storage.count == 0
     }
     
-    func removeKey() -> CodingKey? {
+    public func removeKey() -> CodingKey? {
         defer { self.key = nil }
         return self.key
     }
     
-    func set(_ encoded: Any) {
+    public func set(_ encoded: Any) {
         
         let key = self.removeKey()
         
@@ -118,7 +118,7 @@ extension EncoderBase {
         self.storage.append((key, encoded))
     }
     
-    func encode<T>(_ value: T, with box: (T)throws->Any) throws {
+    public func encode<T>(_ value: T, with box: (T)throws->Any) throws {
         
         do {
             try self.set(box(value))
@@ -150,23 +150,23 @@ extension EncoderBase {
     
     // MARK: encoder.box(_:)
     
-    func box(_ value: Void  ) throws -> Any{return NSNull()}
-    func box(_ value: Bool  ) throws -> Any { return value }
-    func box(_ value: Int   ) throws -> Any { return value }
-    func box(_ value: Int8  ) throws -> Any { return value }
-    func box(_ value: Int16 ) throws -> Any { return value }
-    func box(_ value: Int32 ) throws -> Any { return value }
-    func box(_ value: Int64 ) throws -> Any { return value }
-    func box(_ value: UInt  ) throws -> Any { return value }
-    func box(_ value: UInt8 ) throws -> Any { return value }
-    func box(_ value: UInt16) throws -> Any { return value }
-    func box(_ value: UInt32) throws -> Any { return value }
-    func box(_ value: UInt64) throws -> Any { return value }
-    func box(_ value: Float ) throws -> Any { return value }
-    func box(_ value: Double) throws -> Any { return value }
-    func box(_ value: String) throws -> Any { return value }
+    public func box(_ value: Void  ) throws -> Any{return NSNull()}
+    public func box(_ value: Bool  ) throws -> Any { return value }
+    public func box(_ value: Int   ) throws -> Any { return value }
+    public func box(_ value: Int8  ) throws -> Any { return value }
+    public func box(_ value: Int16 ) throws -> Any { return value }
+    public func box(_ value: Int32 ) throws -> Any { return value }
+    public func box(_ value: Int64 ) throws -> Any { return value }
+    public func box(_ value: UInt  ) throws -> Any { return value }
+    public func box(_ value: UInt8 ) throws -> Any { return value }
+    public func box(_ value: UInt16) throws -> Any { return value }
+    public func box(_ value: UInt32) throws -> Any { return value }
+    public func box(_ value: UInt64) throws -> Any { return value }
+    public func box(_ value: Float ) throws -> Any { return value }
+    public func box(_ value: Double) throws -> Any { return value }
+    public func box(_ value: String) throws -> Any { return value }
     
-    func box(_ value: Encodable) throws -> Any {
+    public func box(_ value: Encodable) throws -> Any {
         
         return try reencode(value)
         
@@ -177,7 +177,7 @@ extension EncoderBase {
         //        }
     }
     
-    func reencode(_ value: Encodable) throws -> Any {
+    public func reencode(_ value: Encodable) throws -> Any {
         
         let count = self.storage.count
         
@@ -196,9 +196,9 @@ extension EncoderBase {
     }
 }
 
-extension EncoderBase where Self.KeyedContainer.Base == Self {
+public extension EncoderBase where Self.KeyedContainer.Base == Self {
     // MARK: - Encoder Methods
-    func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
+    public func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
         
         typealias C = Self.KeyedContainer.Container
         
@@ -225,9 +225,9 @@ extension EncoderBase where Self.KeyedContainer.Base == Self {
     }
 }
 
-extension EncoderBase where Self.UnkeyedContainer.Base == Self {
+public extension EncoderBase where Self.UnkeyedContainer.Base == Self {
     
-    func unkeyedContainer() -> UnkeyedEncodingContainer {
+    public func unkeyedContainer() -> UnkeyedEncodingContainer {
         
         typealias C = Self.UnkeyedContainer.Container
         
@@ -293,13 +293,13 @@ public protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws
 }
 
-extension EncoderKeyedContainer {
+public extension EncoderKeyedContainer {
     
     public var codingPath: [CodingKey] {
         return self.encoder.codingPath + self.nestedPath
     }
     
-    func set(_ encoded: Any, forKey key: CodingKey) {
+    public func set(_ encoded: Any, forKey key: CodingKey) {
         
         if Self.usesStringValue {
 
@@ -313,7 +313,7 @@ extension EncoderKeyedContainer {
         }
     }
     
-    func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws {
+    public func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws {
         
         do {
             
@@ -355,9 +355,9 @@ extension EncoderKeyedContainer {
     }
 }
 
-extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
+public extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
     
-    mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
+    public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
         
         let container = UnkeyedContainer.Container()
         
@@ -367,13 +367,13 @@ extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
     }
 }
 
-extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
+public extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
     
-    mutating func superEncoder() -> Encoder {
+    public mutating func superEncoder() -> Encoder {
         return Reference(encoder: self.encoder, reference: .keyed(self.container, key: "super"), previousPath: self.codingPath + ["super"])
     }
     
-    mutating func superEncoder(forKey key: Key) -> Encoder {
+    public mutating func superEncoder(forKey key: Key) -> Encoder {
         return Reference(encoder: self.encoder, reference: .keyed(self.container, key: key), previousPath: self.codingPath + [key])
     }
 }
@@ -411,7 +411,7 @@ public protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     func encode<T>(_ value: T, with box: (T)throws->Any) throws
 }
 
-extension EncoderUnkeyedContainer {
+public extension EncoderUnkeyedContainer {
     
     /// The path of coding keys taken to get to this point in encoding.
     public var codingPath: [CodingKey] {
@@ -423,7 +423,7 @@ extension EncoderUnkeyedContainer {
         return self.container.count
     }
     
-    func encode<T>(_ value: T, with box: (T)throws->Any) throws {
+    public func encode<T>(_ value: T, with box: (T)throws->Any) throws {
         
         do {
             try self.container.add(box(value))
@@ -463,9 +463,9 @@ extension EncoderUnkeyedContainer {
     }
 }
 
-extension EncoderUnkeyedContainer where Self.KeyedContainer.Base == Self.Base {
+public extension EncoderUnkeyedContainer where Self.KeyedContainer.Base == Self.Base {
     
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
+    public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
         
         let container = KeyedContainer.Container()
         self.container.add(container)
@@ -474,9 +474,9 @@ extension EncoderUnkeyedContainer where Self.KeyedContainer.Base == Self.Base {
     }
 }
 
-extension EncoderUnkeyedContainer where Self.Reference.Super == Self.Base {
+public extension EncoderUnkeyedContainer where Self.Reference.Super == Self.Base {
     
-    mutating func superEncoder() -> Encoder {
+    public mutating func superEncoder() -> Encoder {
         
         defer { container.add("placeholder") }
         
@@ -518,7 +518,7 @@ public protocol EncoderReference : EncoderBase {
 
 extension EncoderReference {
     
-    var codingPath: [CodingKey] {
+    public var codingPath: [CodingKey] {
         return self.previousPath + self.storage.flatMap { $0.key }
     }
     
@@ -545,7 +545,7 @@ extension EncoderReference {
     //    }
     
     // Finalizes `self` by writing the contents of our storage to the reference's storage.
-    func willDeinit() {
+    public func willDeinit() {
         
         precondition(storage.count > 0, "Referencing encoder deallocated without encoding any values")
         precondition(storage.count < 2, "Referencing encoder deallocated with multiple containers on stack.")
@@ -574,9 +574,9 @@ extension EncoderReference {
     }
 }
 
-extension EncoderReference where Super.Options == Self.Options {
+public extension EncoderReference where Super.Options == Self.Options {
     
-    init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey]) {
+    public init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey]) {
         
         self.init(options: encoder.options, userInfo: encoder.userInfo)
         
@@ -586,17 +586,17 @@ extension EncoderReference where Super.Options == Self.Options {
 }
 
 /// a wrapping error to associate an unknown error on encode with a codingPath
-enum EncodeError: Error {
+public enum EncodeError: Error {
     
     case encodeError(Error, atPath: [CodingKey])
     
-    var error: Error {
+    public var error: Error {
         switch self {
         case .encodeError(let error, atPath: _): return error
         }
     }
     
-    var codingPath: [CodingKey] {
+    public var codingPath: [CodingKey] {
         switch self {
         case .encodeError(_, atPath: let codingPath): return codingPath
         }

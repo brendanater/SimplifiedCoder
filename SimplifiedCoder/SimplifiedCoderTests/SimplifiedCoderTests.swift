@@ -9,19 +9,165 @@
 import XCTest
 @testable import SimplifiedCoder
 
-class TestEncoder: XCTestCase {
+enum AnError: Error {
+    case error
+}
+
+class TestEncoderBase: EncoderBase {
     
-    func testExample() {
-        
-        let data: Data = """
-        [
-        {
-            "date": "1504116151"
-        },
-        {
-            "date": "1504116151"
-        }
-        ]
-        """.data(using: .utf8)!
+    typealias KeyedContainer = TestEncoderKeyedContainer<String>
+    
+    typealias UnkeyedContainer = TestEncoderUnkeyedContainer
+    
+    typealias Options = ()
+    
+    var options: ()
+    var userInfo: [CodingUserInfoKey : Any]
+    
+    var storage: [(key: CodingKey?, value: Any)] = []
+    var key: CodingKey? = nil
+    
+    required init(options: (), userInfo: [CodingUserInfoKey : Any]) {
+        self.options = options
+        self.userInfo = userInfo
+    }
+    
+    func box(_ value: String) throws -> Any {
+        throw AnError.error
     }
 }
+
+class TestEncoderReference: TestEncoderBase, EncoderReference {
+    
+    typealias Super = TestEncoderBase
+    
+    var reference: EncoderReferenceValue = .unkeyed(NSMutableArray(), index: 1)
+    var previousPath: [CodingKey] = []
+}
+
+struct TestEncoderKeyedContainer<K: CodingKey>: EncoderKeyedContainer {
+    
+    typealias UnkeyedContainer = TestEncoderUnkeyedContainer
+    typealias Reference = TestEncoderReference
+    typealias Base = TestEncoderBase
+    typealias Key = K
+    
+    var encoder: TestEncoderBase
+    var container: NSMutableDictionary
+    var nestedPath: [CodingKey]
+    
+    init(encoder: TestEncoderBase, container: NSMutableDictionary, nestedPath: [CodingKey]) {
+        self.encoder = encoder
+        self.container = container
+        self.nestedPath = nestedPath
+    }
+    
+    static func initSelf<Key>(encoder: TestEncoderBase, container: NSMutableDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+        return KeyedEncodingContainer(TestEncoderKeyedContainer<Key>(encoder: encoder, container: container, nestedPath: nestedPath))
+    }
+    
+    static var usesStringValue: Bool {
+        return true
+    }
+}
+
+struct TestEncoderUnkeyedContainer: EncoderUnkeyedContainer {
+    
+    typealias KeyedContainer = TestEncoderKeyedContainer<String>
+    typealias Reference = TestEncoderReference
+    typealias Base = TestEncoderBase
+    
+    var encoder: TestEncoderBase
+    var container: NSMutableArray
+    var nestedPath: [CodingKey]
+    
+    init(encoder: TestEncoderBase, container: NSMutableArray, nestedPath: [CodingKey]) {
+        self.encoder = encoder
+        self.container = container
+        self.nestedPath = nestedPath
+    }
+}
+
+let dict = [
+    "test": 1
+]
+
+let arr = [
+    "test"
+]
+
+let top = "test"
+
+let topInt = 1
+
+let topDouble = 1.1
+
+let topFloat = Float(1.1)
+
+class TestEncoder: XCTestCase {
+    
+    typealias Encoder = TestEncoderBase
+    
+    var encoder: Encoder = .init(options: (), userInfo: [:])
+    
+    func test() {
+        
+        do {
+            _ = try encoder.box(dict)
+        } catch {
+            
+        }
+        
+        
+        
+        
+        
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

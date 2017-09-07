@@ -8,8 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		4968F0421F53109500DC43C0 /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4968F0411F53109500DC43C0 /* Decoder.swift */; };
-		8B01EA101F619639008E00EC /* AccessModifiersTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B01EA0F1F619639008E00EC /* AccessModifiersTest.swift */; };
-		8B01EA121F6196D3008E00EC /* TestAccessModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B01EA111F6196D3008E00EC /* TestAccessModifiers.swift */; };
 		8B6A36911F60B05300C25977 /* OrderedDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368D1F60B05300C25977 /* OrderedDictionary.swift */; };
 		8B6A36921F60B05300C25977 /* URLEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368E1F60B05300C25977 /* URLEncoder.swift */; };
 		8B6A36931F60B05300C25977 /* URLDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368F1F60B05300C25977 /* URLDecoder.swift */; };
@@ -35,8 +33,6 @@
 
 /* Begin PBXFileReference section */
 		4968F0411F53109500DC43C0 /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
-		8B01EA0F1F619639008E00EC /* AccessModifiersTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessModifiersTest.swift; sourceTree = "<group>"; };
-		8B01EA111F6196D3008E00EC /* TestAccessModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestAccessModifiers.swift; sourceTree = "<group>"; };
 		8B6A368D1F60B05300C25977 /* OrderedDictionary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OrderedDictionary.swift; sourceTree = "<group>"; };
 		8B6A368E1F60B05300C25977 /* URLEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLEncoder.swift; sourceTree = "<group>"; };
 		8B6A368F1F60B05300C25977 /* URLDecoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLDecoder.swift; sourceTree = "<group>"; };
@@ -112,7 +108,6 @@
 				4968F0411F53109500DC43C0 /* Decoder.swift */,
 				8B9B0BA61F58CBAB005883C3 /* Decoder Helpful Methods.swift */,
 				8B6A368C1F60AFCA00C25977 /* URLEncoder */,
-				8B01EA111F6196D3008E00EC /* TestAccessModifiers.swift */,
 			);
 			path = SimplifiedCoder;
 			sourceTree = "<group>";
@@ -121,7 +116,6 @@
 			isa = PBXGroup;
 			children = (
 				8BA33A5D1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift */,
-				8B01EA0F1F619639008E00EC /* AccessModifiersTest.swift */,
 				8BA33A5F1F4E3DCB00BA7334 /* Info.plist */,
 			);
 			path = SimplifiedCoderTests;
@@ -240,7 +234,6 @@
 				8BA33A561F4E3DB000BA7334 /* Encoder.swift in Sources */,
 				8B9B0BA71F58CBAB005883C3 /* Decoder Helpful Methods.swift in Sources */,
 				8B6A36921F60B05300C25977 /* URLEncoder.swift in Sources */,
-				8B01EA121F6196D3008E00EC /* TestAccessModifiers.swift in Sources */,
 				8B6A36931F60B05300C25977 /* URLDecoder.swift in Sources */,
 				8B6A36911F60B05300C25977 /* OrderedDictionary.swift in Sources */,
 				8B6A36941F60B05300C25977 /* URLQuerySerializer.swift in Sources */,
@@ -253,7 +246,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8B01EA101F619639008E00EC /* AccessModifiersTest.swift in Sources */,
 				8BA33A5E1F4E3DCB00BA7334 /* SimplifiedCoderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

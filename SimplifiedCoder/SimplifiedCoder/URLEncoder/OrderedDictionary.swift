@@ -46,9 +46,13 @@ public protocol OrderedDictionaryProtocol: Sequence, ExpressibleByDictionaryLite
     // new
     
     subscript(key: Key) -> Value? {get set}
+    
+    func getValue(forKey key: Key) -> Value?
+    
+    mutating func replaceOrAppendValue(forKey key: Key, with newValue: Value?)
 }
 
-extension OrderedDictionaryProtocol {
+public extension OrderedDictionaryProtocol {
     
     public init(dictionaryLiteral elements: (Key, Value)...) {
         self.init(elements)
