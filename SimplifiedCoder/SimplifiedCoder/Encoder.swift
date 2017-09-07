@@ -547,8 +547,8 @@ extension EncoderReference {
     // Finalizes `self` by writing the contents of our storage to the reference's storage.
     public func willDeinit() {
         
-        precondition(storage.count > 0, "Referencing encoder deallocated without encoding any values")
-        precondition(storage.count < 2, "Referencing encoder deallocated with multiple containers on stack.")
+        guard self.storage.count > 0 else { return }
+        precondition(self.storage.count < 2, "Referencing encoder deallocated with multiple containers on stack.")
         
         let encoded = self.storage.removeLast().value
         

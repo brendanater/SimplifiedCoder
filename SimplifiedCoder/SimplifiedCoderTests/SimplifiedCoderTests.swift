@@ -33,7 +33,11 @@ class TestEncoderBase: EncoderBase {
     }
     
     func box(_ value: String) throws -> Any {
-        throw AnError.error
+        if value == "throw" {
+            throw AnError.error
+        } else {
+            return value
+        }
     }
 }
 
@@ -43,6 +47,10 @@ class TestEncoderReference: TestEncoderBase, EncoderReference {
     
     var reference: EncoderReferenceValue = .unkeyed(NSMutableArray(), index: 1)
     var previousPath: [CodingKey] = []
+    
+    deinit {
+        willDeinit()
+    }
 }
 
 struct TestEncoderKeyedContainer<K: CodingKey>: EncoderKeyedContainer {
@@ -89,11 +97,11 @@ struct TestEncoderUnkeyedContainer: EncoderUnkeyedContainer {
 }
 
 let dict = [
-    "test": 1
+    "test": "test"
 ]
 
 let arr = [
-    "test"
+    "throw"
 ]
 
 let top = "test"
@@ -104,6 +112,18 @@ let topDouble = 1.1
 
 let topFloat = Float(1.1)
 
+class TestObject: Codable {
+    
+    struct Test: Codable {
+        var int = 1
+        var str = "test"
+    }
+    
+    var int = 1
+    var str = "test"
+    
+}
+
 class TestEncoder: XCTestCase {
     
     typealias Encoder = TestEncoderBase
@@ -113,9 +133,9 @@ class TestEncoder: XCTestCase {
     func test() {
         
         do {
-            _ = try encoder.box(dict)
+            print(try encoder.box(arr))
         } catch {
-            
+            XCTFail("Error was thrown: \(error)")
         }
         
         
