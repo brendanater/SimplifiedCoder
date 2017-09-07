@@ -28,13 +28,13 @@
 import Foundation
 
 /// the encoder that the user calls to abstract away complexity
-protocol TopLevelEncoder {
+public protocol TopLevelEncoder {
     
     func encode(_ value: Encodable) throws -> Data
 }
 
 // MARK: - EncoderBase
-protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
+public protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     
     // references
     
@@ -90,11 +90,11 @@ extension EncoderBase {
     
     /// The path to the current point in encoding.
     public var codingPath: [CodingKey] {
-        return storage.flatMap { $0.key }
+        return self.storage.flatMap { $0.key }
     }
     
     var canEncodeNewValue: Bool {
-        return key != nil || self.storage.count == 0
+        return self.key != nil || self.storage.count == 0
     }
     
     func removeKey() -> CodingKey? {
@@ -108,7 +108,7 @@ extension EncoderBase {
         
         guard self.canEncodeNewValue else {
             
-            let v = storage.last!.value
+            let v = self.storage.last!.value
             let first = "\(v) of type: \(type(of: v))"
             let second = "\(encoded) of type: \(type(of: encoded))"
             
@@ -121,7 +121,7 @@ extension EncoderBase {
     func encode<T>(_ value: T, with box: (T)throws->Any) throws {
         
         do {
-            try set(box(value))
+            try self.set(box(value))
             
         } catch let error as EncodeError {
             throw error
@@ -200,7 +200,7 @@ extension EncoderBase where Self.KeyedContainer.Base == Self {
     // MARK: - Encoder Methods
     func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
         
-        typealias C = KeyedContainer.Container
+        typealias C = Self.KeyedContainer.Container
         
         // If an existing keyed container was already requested, return that one.
         let container: C
@@ -209,7 +209,7 @@ extension EncoderBase where Self.KeyedContainer.Base == Self {
             
             container = C()
             
-            set(container)
+            self.set(container)
             
         } else {
             // could just crash here, but checks if the last encoded container is the same type and returns that.
@@ -229,7 +229,7 @@ extension EncoderBase where Self.UnkeyedContainer.Base == Self {
     
     func unkeyedContainer() -> UnkeyedEncodingContainer {
         
-        typealias C = UnkeyedContainer.Container
+        typealias C = Self.UnkeyedContainer.Container
         
         let container: C
         
@@ -237,7 +237,7 @@ extension EncoderBase where Self.UnkeyedContainer.Base == Self {
             
             container = C()
             
-            set(container)
+            self.set(container)
             
         } else {
             // could just crash here, but checks if the last encoded container is the same type and returns that.
@@ -251,20 +251,22 @@ extension EncoderBase where Self.UnkeyedContainer.Base == Self {
         
         return UnkeyedContainer(encoder: self, container: container, nestedPath: [])
     }
-    
 }
 
-/// has to be a class to set the value to a central object
-protocol EncoderKeyedContainerType: class {
-    subscript(key: String) -> Any? {get set}
-    subscript(key: Int) -> Any? {get set}
+
+
+/// has to be a class to set to an already set object
+public protocol EncoderKeyedContainerType: class {
+    
+    subscript(key: Any) -> Any? {get set}
+    
     init()
 }
 
 extension NSMutableDictionary: EncoderKeyedContainerType {}
 
 // MARK: - Encoding Containers
-protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
+public protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     
     // references
     
@@ -294,19 +296,19 @@ protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
 extension EncoderKeyedContainer {
     
     public var codingPath: [CodingKey] {
-        return encoder.codingPath + nestedPath
+        return self.encoder.codingPath + self.nestedPath
     }
     
     func set(_ encoded: Any, forKey key: CodingKey) {
         
         if Self.usesStringValue {
-            
+
             self.container[key.stringValue] = encoded
-            
+
         } else {
-            
+
             precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
-            
+
             self.container[key.intValue!] = encoded
         }
     }
@@ -315,7 +317,7 @@ extension EncoderKeyedContainer {
         
         do {
             
-            try set(box(value), forKey: key)
+            try self.set(box(value), forKey: key)
             
         } catch let error as EncodeError {
             throw error
@@ -347,7 +349,7 @@ extension EncoderKeyedContainer {
         
         let container = Container()
         
-        set(container, forKey: key)
+        self.set(container, forKey: key)
         
         return Self.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key], keyedBy: NestedKey.self)
     }
@@ -359,7 +361,7 @@ extension EncoderKeyedContainer where Self.UnkeyedContainer.Base == Self.Base {
         
         let container = UnkeyedContainer.Container()
         
-        set(container, forKey: key)
+        self.set(container, forKey: key)
         
         return UnkeyedContainer(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key])
     }
@@ -376,16 +378,17 @@ extension EncoderKeyedContainer where Self.Reference.Super == Self.Base {
     }
 }
 
-protocol EncoderUnkeyedContainerType: class {
+public protocol EncoderUnkeyedContainerType: class {
+    
+    init()
     var count: Int {get}
     func add(_ value: Any)
-    init()
     func replaceObject(at index: Int, with object: Any)
 }
 
 extension NSMutableArray: EncoderUnkeyedContainerType {}
 
-protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
+public protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     
     // references
     
@@ -412,7 +415,7 @@ extension EncoderUnkeyedContainer {
     
     /// The path of coding keys taken to get to this point in encoding.
     public var codingPath: [CodingKey] {
-        return encoder.codingPath + nestedPath
+        return self.encoder.codingPath + self.nestedPath
     }
     
     /// The number of elements encoded into the container.
@@ -481,12 +484,12 @@ extension EncoderUnkeyedContainer where Self.Reference.Super == Self.Base {
     }
 }
 
-enum EncoderReferenceValue {
+public enum EncoderReferenceValue {
     case keyed(EncoderKeyedContainerType, key: CodingKey)
     case unkeyed(EncoderUnkeyedContainerType, index: Int)
 }
 
-protocol EncoderReference : EncoderBase {
+public protocol EncoderReference : EncoderBase {
     
     // references
     
@@ -504,7 +507,6 @@ protocol EncoderReference : EncoderBase {
     
     // new methods
     
-    // not required if Super.Options == Self.Options
     init(encoder: Super, reference: EncoderReferenceValue, previousPath: [CodingKey])
     
     var codingPath: [CodingKey] {get}
@@ -517,7 +519,7 @@ protocol EncoderReference : EncoderBase {
 extension EncoderReference {
     
     var codingPath: [CodingKey] {
-        return previousPath + storage.flatMap { $0.key }
+        return self.previousPath + self.storage.flatMap { $0.key }
     }
     
     // not supported (would change expected behaviour), but it would be nice. (incomplete)
@@ -548,22 +550,26 @@ extension EncoderReference {
         precondition(storage.count > 0, "Referencing encoder deallocated without encoding any values")
         precondition(storage.count < 2, "Referencing encoder deallocated with multiple containers on stack.")
         
-        let value = self.storage.removeLast().value
+        let encoded = self.storage.removeLast().value
         
         switch self.reference {
+            
         case .unkeyed(let container, index: let index):
-            container.replaceObject(at: index, with: value)
+            
+            container.replaceObject(at: index, with: encoded)
             
         case .keyed(let container, key: let key):
             
             if Self.KeyedContainer.usesStringValue {
-                container[key.stringValue] = container[key.stringValue] ?? value
-            } else {
-                precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
+
+                container[key.stringValue] = encoded
                 
-                container[key.intValue!] = container[key.intValue!] ?? value
+            } else {
+                
+                precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
+
+                container[key.intValue!] = encoded
             }
-            
         }
     }
 }

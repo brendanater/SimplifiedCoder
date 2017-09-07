@@ -47,64 +47,6 @@ import Foundation
 //}
 
 
-//
-//struct NumberLossyConversionStrategy: OptionSet {
-//
-//    let rawValue: Int
-//
-//    static let dontAllow = NumberLossyConversionStrategy(rawValue: 0)
-//    /// use Number.init(NSNumber)
-//    static let initNSNumber = NumberLossyConversionStrategy(rawValue: 1)
-//    /// use Number.init(clamping: Int or UInt)
-//    /// float and double default to init(NSNumber)
-//    static let clampingIntegers = NumberLossyConversionStrategy(rawValue: 2)
-//    /// use Number.init(truncating: NSNumber)
-//    static let truncating = NumberLossyConversionStrategy(rawValue: 3)
-//
-//}
-//
-//    func convert<T: ConvertibleNumber>(number value: Any) throws -> T {
-//
-//        if let number = value as? T {
-//            return number
-//
-//        } else if let number = value as? NSNumber ?? NumberFormatter.shared.number(from: value as? String ?? "˜∆åƒ˚")  {
-//
-//            if let number = T(exactly: number) {
-//                return number
-//            }
-//
-//            switch options.numberLossyConversionStrategy {
-//
-//            case .dontAllow:
-//                break
-//
-//            case .initNSNumber:
-//                return T(number)
-//
-//            case .clampingIntegers:
-//                if let type = T.self as? ConvertibleInteger.Type {
-//                    if number.intValue < 0 {
-//                        return type.init(clamping: number.intValue) as! T
-//                    } else {
-//                        return type.init(clamping: number.uintValue) as! T
-//                    }
-//                } else {
-//                    return T(number)
-//                }
-//
-//            case .truncating:
-//                return T(truncating: number)
-//
-//            default: fatalError("Unknown \(NumberLossyConversionStrategy.self) override \(Base2.self).convert(number:)")
-//
-//            }
-//        }
-//
-//        throw failedToUnbox(value, to: T.self)
-//    }
-//
-
 
 
 //    typealias Options = (

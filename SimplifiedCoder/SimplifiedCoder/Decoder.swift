@@ -56,8 +56,6 @@ protocol DecoderBase: class, Decoder, SingleValueDecodingContainer {
     
     // new methods
     
-    var stringDefaultsToDescription: Bool {get}
-    
     func decodeNil() -> Bool
     
     func error(_ error: Error, at codingPath: [CodingKey]) -> Error
@@ -96,12 +94,8 @@ extension DecoderBase {
     
     // MARK: decode single value
     
-    var stringDefaultsToDescription: Bool {
-        return true
-    }
-    
     func decodeNil() -> Bool {
-        return isNil(storage.last)
+        return isNil(self.storage.last)
     }
     
     /// casts an error to the right codingPath and type
@@ -121,28 +115,28 @@ extension DecoderBase {
     func decode<T>(with unbox: (Any)throws->T) throws -> T {
         
         do {
-            return try unbox(storage.last!)
+            return try unbox(self.storage.last!)
             
         } catch {
-            throw self.error(error, at: codingPath)
+            throw self.error(error, at: self.codingPath)
         }
     }
     
-    public func decode(_: Bool.Type  ) throws -> Bool   { return try decode(with: unbox(_:)) }
-    public func decode(_: Int.Type   ) throws -> Int    { return try decode(with: unbox(_:)) }
-    public func decode(_: Int8.Type  ) throws -> Int8   { return try decode(with: unbox(_:)) }
-    public func decode(_: Int16.Type ) throws -> Int16  { return try decode(with: unbox(_:)) }
-    public func decode(_: Int32.Type ) throws -> Int32  { return try decode(with: unbox(_:)) }
-    public func decode(_: Int64.Type ) throws -> Int64  { return try decode(with: unbox(_:)) }
-    public func decode(_: UInt.Type  ) throws -> UInt   { return try decode(with: unbox(_:)) }
-    public func decode(_: UInt8.Type ) throws -> UInt8  { return try decode(with: unbox(_:)) }
-    public func decode(_: UInt16.Type) throws -> UInt16 { return try decode(with: unbox(_:)) }
-    public func decode(_: UInt32.Type) throws -> UInt32 { return try decode(with: unbox(_:)) }
-    public func decode(_: UInt64.Type) throws -> UInt64 { return try decode(with: unbox(_:)) }
-    public func decode(_: Float.Type ) throws -> Float  { return try decode(with: unbox(_:)) }
-    public func decode(_: Double.Type) throws -> Double { return try decode(with: unbox(_:)) }
-    public func decode(_: String.Type) throws -> String { return try decode(with: unbox(_:)) }
-    public func decode<T: Decodable>(_: T.Type)throws->T{ return try decode(with: unbox(_:)) }
+    public func decode(_: Bool.Type  ) throws -> Bool   { return try self.decode(with: unbox(_:)) }
+    public func decode(_: Int.Type   ) throws -> Int    { return try self.decode(with: unbox(_:)) }
+    public func decode(_: Int8.Type  ) throws -> Int8   { return try self.decode(with: unbox(_:)) }
+    public func decode(_: Int16.Type ) throws -> Int16  { return try self.decode(with: unbox(_:)) }
+    public func decode(_: Int32.Type ) throws -> Int32  { return try self.decode(with: unbox(_:)) }
+    public func decode(_: Int64.Type ) throws -> Int64  { return try self.decode(with: unbox(_:)) }
+    public func decode(_: UInt.Type  ) throws -> UInt   { return try self.decode(with: unbox(_:)) }
+    public func decode(_: UInt8.Type ) throws -> UInt8  { return try self.decode(with: unbox(_:)) }
+    public func decode(_: UInt16.Type) throws -> UInt16 { return try self.decode(with: unbox(_:)) }
+    public func decode(_: UInt32.Type) throws -> UInt32 { return try self.decode(with: unbox(_:)) }
+    public func decode(_: UInt64.Type) throws -> UInt64 { return try self.decode(with: unbox(_:)) }
+    public func decode(_: Float.Type ) throws -> Float  { return try self.decode(with: unbox(_:)) }
+    public func decode(_: Double.Type) throws -> Double { return try self.decode(with: unbox(_:)) }
+    public func decode(_: String.Type) throws -> String { return try self.decode(with: unbox(_:)) }
+    public func decode<T: Decodable>(_: T.Type)throws->T{ return try self.decode(with: unbox(_:)) }
     
     // MARK: unbox
     
@@ -150,9 +144,9 @@ extension DecoderBase {
     func failedToUnbox<T>(_ value: Any, to type: T.Type, _ typeDescription: String? = nil) -> UnboxError {
         
         if isNil(value) {
-            return notFound(type, typeDescription)
+            return self.notFound(type, typeDescription)
         } else {
-            return typeError(value, type, typeDescription)
+            return self.typeError(value, type, typeDescription)
         }
     }
     
@@ -201,38 +195,36 @@ extension DecoderBase {
             }
         }
         
-        throw failedToUnbox(value, to: T.self)
+        throw self.failedToUnbox(value, to: T.self)
     }
     
     func unbox(_ value: Any) throws -> Bool { return value as? Bool ?? isNil(value) }
     
-    func unbox(_ value: Any) throws -> Int    { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> Int8   { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> Int16  { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> Int32  { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> Int64  { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> UInt   { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> UInt8  { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> UInt16 { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> UInt32 { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> UInt64 { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> Float  { return try convert(number: value) }
-    func unbox(_ value: Any) throws -> Double { return try convert(number: value) }
+    func unbox(_ value: Any) throws -> Int    { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> Int8   { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> Int16  { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> Int32  { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> Int64  { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> UInt   { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> UInt8  { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> UInt16 { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> UInt32 { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> UInt64 { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> Float  { return try self.convert(number: value) }
+    func unbox(_ value: Any) throws -> Double { return try self.convert(number: value) }
     
     func unbox(_ value: Any) throws -> String {
         
         if let string = value as? String {
             return string
             
-        } else if stringDefaultsToDescription {
+        } else {
             return "\(value)"
         }
-        
-        throw failedToUnbox(value, to: String.self)
     }
     
     func unbox<T: Decodable>(_ value: Any) throws -> T {
-        return try redecode(value)
+        return try self.redecode(value)
         //        switch T.self {
         //        case is Date: return try unbox(value) as Date
         //        default: return try redecode(value)
@@ -259,14 +251,14 @@ extension DecoderBase where KeyedContainer.Base == Self {
     
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
         
-        let value = storage.last as Any
+        let value = self.storage.last as Any
         
-        guard let container = value as? KeyedContainer.Container else {
-            throw failedToUnbox(value, to: KeyedDecodingContainer<Key>.self, "keyed container")
-                .asDecodingError(with: codingPath)
+        guard let container = value as? NSDictionary else {
+            throw self.failedToUnbox(value, to: KeyedDecodingContainer<Key>.self, "keyed container")
+                .asDecodingError(with: self.codingPath)
         }
         
-        return KeyedContainer.initSelf(
+        return Self.KeyedContainer.initSelf(
             decoder: self,
             container: container,
             nestedPath: [],
@@ -279,11 +271,11 @@ extension DecoderBase where UnkeyedContainer.Base == Self {
     
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
         
-        let value = storage.last as Any
+        let value = self.storage.last as Any
         
-        guard let container = value as? UnkeyedContainer.Container else {
-            throw failedToUnbox(value, to: UnkeyedDecodingContainer.self, "unkeyed container")
-                .asDecodingError(with: codingPath)
+        guard let container = value as? NSArray else {
+            throw self.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "unkeyed container")
+                .asDecodingError(with: self.codingPath)
         }
         
         return UnkeyedContainer(
@@ -296,53 +288,22 @@ extension DecoderBase where UnkeyedContainer.Base == Self {
 
 // MARK: KeyedContainer
 
-protocol DecoderKeyedContainerType {
-    
-    subscript(key: String) -> Any? {get set}
-    
-    subscript(key: Int) -> Any? {get set}
-    
-    var allKeys: [Any] {get}
-}
-
-extension NSDictionary: DecoderKeyedContainerType {
-    
-    subscript(key: String) -> Any? {
-        get {
-            return self[key]
-        }
-        set {
-            self[key] = newValue
-        }
-    }
-    
-    subscript(key: Int) -> Any? {
-        get {
-            return self[key]
-        }
-        set {
-            self[key] = newValue
-        }
-    }
-}
-
 protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
     // references
     
     associatedtype UnkeyedContainer: DecoderUnkeyedContainer
     associatedtype Base: DecoderBase
-    associatedtype Container: DecoderKeyedContainerType = NSDictionary
     
     // required
     
     var decoder: Base {get}
-    var container: Container {get}
+    var container: NSDictionary {get}
     var nestedPath: [CodingKey] {get}
     
-    init(decoder: Base, container: Container, nestedPath: [CodingKey])
+    init(decoder: Base, container: NSDictionary, nestedPath: [CodingKey])
     
-    static func initSelf<Key: CodingKey>(decoder: Base, container: Container, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key>
+    static func initSelf<Key: CodingKey>(decoder: Base, container: NSDictionary, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key>
     
     static var usesStringValue: Bool {get}
     
@@ -350,7 +311,7 @@ protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
     
     func value(forKey key: CodingKey) throws -> Any
     
-    func optionalValue(forKey key: CodingKey) -> Any?
+    func optionalValue(forKey key: CodingKey) -> Any
     
     func decode<T>(with unbox: (Any)throws->T, forKey key: Key) throws -> T
 }
@@ -358,7 +319,7 @@ protocol DecoderKeyedContainer: KeyedDecodingContainerProtocol {
 extension DecoderKeyedContainer {
     
     public var codingPath: [CodingKey] {
-        return decoder.codingPath + nestedPath
+        return self.decoder.codingPath + self.nestedPath
     }
     
     public var allKeys: [Key] {
@@ -376,111 +337,108 @@ extension DecoderKeyedContainer {
         }
     }
     
-    func value(forKey key: CodingKey) throws -> Any {
+    func _key(from key: CodingKey) -> Any {
         
         if Self.usesStringValue {
-            
-            guard let value = self.container[key.stringValue] else {
-                throw DecodingError.keyNotFound(
-                    key,
-                    DecodingError.Context(
-                        codingPath: codingPath + [key],
-                        debugDescription: "No value found for key \(key) (\(key.stringValue))."
-                    )
-                )
-            }
-            
-            return value
+            return key.stringValue
             
         } else {
             
-            precondition(key.intValue != nil, "Tried to get intValue for key: \(key) in KeyedDecodingContainer<\(Key.self)>, but found nil.")
-            
-            guard let value = self.container[key.intValue!] else {
-                throw DecodingError.keyNotFound(
-                    key,
-                    DecodingError.Context(
-                        codingPath: codingPath + [key],
-                        debugDescription: "No value found for key \(key) (\(key.intValue!))."
-                    )
-                )
+            guard key.intValue != nil else {
+                fatalError("Tried to get \(key as? String == "super" ? "" : "\(type(of: key)).")\(key).intValue but found nil")
             }
             
-            return value
+            return key.intValue!
         }
     }
     
-    func optionalValue(forKey key: CodingKey) -> Any? {
-        let _value = try? value(forKey: key)
-        return _value
+    func value(forKey key: CodingKey) throws -> Any {
+        
+        guard let value = self.container[self._key(from: key)] else {
+            throw DecodingError.keyNotFound(
+                key,
+                DecodingError.Context(
+                    codingPath: self.codingPath + [key],
+                    debugDescription: "No value found for key: \(self._key(from: key)) (\(key))"
+                )
+            )
+        }
+        
+        return value
+    }
+    
+    func optionalValue(forKey key: CodingKey) -> Any {
+        
+        let value = try? self.value(forKey: key)
+        
+        return value as Any
     }
     
     public func contains(_ key: Key) -> Bool {
         
-        return optionalValue(forKey: key) != nil
+        return isNil(self.optionalValue(forKey: key))
     }
     
     public func decodeNil(forKey key: Key) throws -> Bool {
         
         // throw if key not found
-        return try isNil(value(forKey: key))
+        return try isNil(self.value(forKey: key))
     }
     
     func decode<T>(with unbox: (Any)throws->T, forKey key: Key) throws -> T {
         
         do {
-            return try unbox(value(forKey: key))
+            return try unbox(self.value(forKey: key))
         } catch {
-            throw decoder.error(error, at: codingPath + [key])
+            throw self.decoder.error(error, at: codingPath + [key])
         }
     }
     
-    public func decode(_ type: Bool.Type  , forKey key: Key) throws -> Bool   { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: Int.Type   , forKey key: Key) throws -> Int    { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: Int8.Type  , forKey key: Key) throws -> Int8   { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: Int16.Type , forKey key: Key) throws -> Int16  { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: Int32.Type , forKey key: Key) throws -> Int32  { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: Int64.Type , forKey key: Key) throws -> Int64  { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: UInt.Type  , forKey key: Key) throws -> UInt   { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: UInt8.Type , forKey key: Key) throws -> UInt8  { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: UInt16.Type, forKey key: Key) throws -> UInt16 { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: UInt32.Type, forKey key: Key) throws -> UInt32 { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: Float.Type , forKey key: Key) throws -> Float  { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: Double.Type, forKey key: Key) throws -> Double { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode(_ type: String.Type, forKey key: Key) throws -> String { return try decode(with: decoder.unbox(_:), forKey: key) }
-    public func decode<T: Decodable>(_ type: T.Type, forKey key: Key)throws->T{ return try decode(with: decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Bool.Type  , forKey key: Key) throws -> Bool   { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Int.Type   , forKey key: Key) throws -> Int    { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Int8.Type  , forKey key: Key) throws -> Int8   { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Int16.Type , forKey key: Key) throws -> Int16  { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Int32.Type , forKey key: Key) throws -> Int32  { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Int64.Type , forKey key: Key) throws -> Int64  { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: UInt.Type  , forKey key: Key) throws -> UInt   { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: UInt8.Type , forKey key: Key) throws -> UInt8  { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: UInt16.Type, forKey key: Key) throws -> UInt16 { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: UInt32.Type, forKey key: Key) throws -> UInt32 { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Float.Type , forKey key: Key) throws -> Float  { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: Double.Type, forKey key: Key) throws -> Double { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode(_ type: String.Type, forKey key: Key) throws -> String { return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
+    public func decode<T: Decodable>(_ type: T.Type, forKey key: Key)throws->T{ return try self.decode(with: self.decoder.unbox(_:), forKey: key) }
     
     public func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
         
         let value = try self.value(forKey: key)
         
-        guard let container = value as? Container else {
-            throw decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
-                .asDecodingError(with: codingPath + [key])
+        guard let container = value as? NSDictionary else {
+            throw self.decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
+                .asDecodingError(with: self.codingPath + [key])
         }
         
-        return Self.initSelf(decoder: decoder, container: container, nestedPath: nestedPath + [key], keyedBy: NestedKey.self)
+        return Self.initSelf(decoder: self.decoder, container: container, nestedPath: self.nestedPath + [key], keyedBy: NestedKey.self)
     }
     
     private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
         
-        let value = try? self.value(forKey: key)
-        
-        return Base(
-            value: value ?? NSNull(),
-            codingPath: codingPath + [key],
-            options: decoder.options,
-            userInfo: decoder.userInfo
+        return Self.Base(
+            value: self.optionalValue(forKey: key),
+            codingPath: self.codingPath + [key],
+            options: self.decoder.options,
+            userInfo: self.decoder.userInfo
         )
     }
     
     public func superDecoder() throws -> Decoder {
-        return try _superDecoder(forKey: "super")
+        
+        return try self._superDecoder(forKey: "super")
     }
     
     public func superDecoder(forKey key: Key) throws -> Decoder {
-        return try _superDecoder(forKey: key)
+        return try self._superDecoder(forKey: key)
     }
 }
 
@@ -490,27 +448,20 @@ extension DecoderKeyedContainer where UnkeyedContainer.Base == Self.Base {
         
         let value = try self.value(forKey: key)
         
-        guard let container = value as? UnkeyedContainer.Container else {
-            throw decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container")
-                .asDecodingError(with: codingPath + [key])
+        guard let container = value as? NSArray else {
+            throw self.decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container")
+                .asDecodingError(with: self.codingPath + [key])
         }
         
-        return UnkeyedContainer(
-            decoder: decoder,
+        return Self.UnkeyedContainer(
+            decoder: self.decoder,
             container: container,
-            nestedPath: nestedPath + [key]
+            nestedPath: self.nestedPath + [key]
         )
     }
 }
 
 // MARK: UnkeyedContainer
-
-protocol DecoderUnkeyedContainerType {
-    subscript(index: Int) -> Any {get}
-    var count: Int {get}
-}
-
-extension NSArray: DecoderUnkeyedContainerType {}
 
 protocol DecoderUnkeyedContainer: UnkeyedDecodingContainer {
     
@@ -520,15 +471,14 @@ protocol DecoderUnkeyedContainer: UnkeyedDecodingContainer {
     // default with <CodingKey> (<String>)
     associatedtype KeyedContainer: DecoderKeyedContainer
     associatedtype Base: DecoderBase
-    associatedtype Container: DecoderUnkeyedContainerType = NSArray
     
     // required
     
     var decoder: Base {get}
-    var container: Container {get}
+    var container: NSArray {get}
     var nestedPath: [CodingKey] {get}
     
-    init(decoder: Base, container: Container, nestedPath: [CodingKey])
+    init(decoder: Base, container: NSArray, nestedPath: [CodingKey])
     
     var currentIndex: Int {get set}
     
@@ -545,7 +495,7 @@ extension DecoderUnkeyedContainer {
     
     public var codingPath: [CodingKey] {
         
-        return decoder.codingPath + nestedPath
+        return self.decoder.codingPath + self.nestedPath
     }
     
     public var count: Int? {
@@ -555,7 +505,7 @@ extension DecoderUnkeyedContainer {
     
     public var isAtEnd: Bool {
         
-        return currentIndex >= container.count
+        return self.currentIndex >= self.container.count
     }
     
     public mutating func decodeNil() throws -> Bool {
@@ -563,12 +513,12 @@ extension DecoderUnkeyedContainer {
         // will decode a null value, be sure to increment path.
         defer { self.currentIndex += 1 }
         
-        return self.isAtEnd || isNil(container[currentIndex])
+        return self.isAtEnd || isNil(self.container[self.currentIndex])
     }
     
     var currentKey: CodingKey {
         
-        return "index \(currentIndex)"
+        return "index \(self.currentIndex)"
     }
     
     /// gets the next value if not at end or throws valueNotFound(type, context)
@@ -582,7 +532,7 @@ extension DecoderUnkeyedContainer {
             throw DecodingError.valueNotFound(
                 type,
                 DecodingError.Context(
-                    codingPath: codingPath + [currentKey],
+                    codingPath: self.codingPath + [self.currentKey],
                     debugDescription: "Cannot get \(typeDescription) -- Unkeyed container is at end."
                 )
             )
@@ -590,60 +540,60 @@ extension DecoderUnkeyedContainer {
         
         // avoid this pitfall, isAtEnd is/should be/will be called before decoding a value, so, isAtEnd must be correct before calling next
         
-        defer { currentIndex += 1 }
+        defer { self.currentIndex += 1 }
         
-        return container[currentIndex]
+        return self.container[self.currentIndex]
     }
     
     mutating func decode<T>(with unbox: (Any)throws->T) throws -> T {
         
         do {
-            return try unbox(next(T.self))
+            return try unbox(self.next(T.self))
         } catch {
-            throw decoder.error(error, at: codingPath + [currentKey])
+            throw self.decoder.error(error, at: self.codingPath + [self.currentKey])
         }
     }
     
-    public mutating func decode(_ type: Bool.Type  ) throws -> Bool   { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: Int.Type   ) throws -> Int    { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: Int8.Type  ) throws -> Int8   { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: Int16.Type ) throws -> Int16  { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: Int32.Type ) throws -> Int32  { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: Int64.Type ) throws -> Int64  { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: UInt.Type  ) throws -> UInt   { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: UInt8.Type ) throws -> UInt8  { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: UInt16.Type) throws -> UInt16 { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: UInt32.Type) throws -> UInt32 { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: UInt64.Type) throws -> UInt64 { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: Float.Type ) throws -> Float  { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: Double.Type) throws -> Double { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode(_ type: String.Type) throws -> String { return try decode(with: decoder.unbox(_:)) }
-    public mutating func decode<T: Decodable>(_ type: T.Type)throws->T{ return try decode(with: decoder.unbox(_:)) }
+    public mutating func decode(_ type: Bool.Type  ) throws -> Bool   { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: Int.Type   ) throws -> Int    { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: Int8.Type  ) throws -> Int8   { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: Int16.Type ) throws -> Int16  { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: Int32.Type ) throws -> Int32  { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: Int64.Type ) throws -> Int64  { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: UInt.Type  ) throws -> UInt   { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: UInt8.Type ) throws -> UInt8  { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: UInt16.Type) throws -> UInt16 { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: UInt32.Type) throws -> UInt32 { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: UInt64.Type) throws -> UInt64 { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: Float.Type ) throws -> Float  { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: Double.Type) throws -> Double { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode(_ type: String.Type) throws -> String { return try self.decode(with: self.decoder.unbox(_:)) }
+    public mutating func decode<T: Decodable>(_ type: T.Type)throws->T{ return try self.decode(with: self.decoder.unbox(_:)) }
     
     
     public mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
         
-        let value = try next(UnkeyedDecodingContainer.self, "nested unkeyed container")
+        let value = try self.next(UnkeyedDecodingContainer.self, "nested unkeyed container")
         
-        guard let container = value as? Container else {
-            throw decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container")
-                .asDecodingError(with: codingPath + [currentKey])
+        guard let container = value as? NSArray else {
+            throw self.decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container")
+                .asDecodingError(with: self.codingPath + [self.currentKey])
         }
         
         return Self.init(
-            decoder: decoder,
+            decoder: self.decoder,
             container: container,
-            nestedPath: nestedPath + [currentKey]
+            nestedPath: self.nestedPath + [self.currentKey]
         )
     }
     
     mutating func superDecoder() throws -> Decoder {
         
         return try Base(
-            value: next(Decoder.self, "value for super decoder"),
-            codingPath: codingPath + ["super: \(currentKey)"],
-            options: decoder.options,
-            userInfo: decoder.userInfo
+            value: self.next(Decoder.self, "value for super decoder"),
+            codingPath: self.codingPath + ["super: \(self.currentKey)"],
+            options: self.decoder.options,
+            userInfo: self.decoder.userInfo
         )
     }
 }
@@ -652,17 +602,17 @@ extension DecoderUnkeyedContainer where KeyedContainer.Base == Self.Base {
     
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
         
-        let value = try next(KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
+        let value = try self.next(KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
         
-        guard let container = value as? KeyedContainer.Container else {
-            throw decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
-                .asDecodingError(with: codingPath + [currentKey])
+        guard let container = value as? NSDictionary else {
+            throw self.decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
+                .asDecodingError(with: self.codingPath + [self.currentKey])
         }
         
         return KeyedContainer.initSelf(
-            decoder: decoder,
+            decoder: self.decoder,
             container: container,
-            nestedPath: nestedPath + [currentKey],
+            nestedPath: self.nestedPath + [self.currentKey],
             keyedBy: NestedKey.self
         )
     }

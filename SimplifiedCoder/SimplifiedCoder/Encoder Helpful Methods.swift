@@ -28,6 +28,8 @@
 import Foundation
 
 
+// JSON
+
 //    open func encode<T : Encodable>(_ value: T) throws -> Data {
 //        let encoder = _JSONEncoder(options: self.options)
 //
@@ -51,25 +53,11 @@ import Foundation
 //        }
 //    }
 
-
-
 //fileprivate typealias _Options = (
 //    dateEncodingStrategy: JSONEncoder.DateEncodingStrategy,
 //    dataEncodingStrategy: JSONEncoder.DataEncodingStrategy,
 //    nonConformingFloatEncodingStrategy: JSONEncoder.NonConformingFloatEncodingStrategy
 //)
-//
-//func getFloatEncodingStrategy() -> (pos: String, neg: String, nan: String)? {
-//    if case let .convertToString(
-//        positiveInfinity: pos,
-//        negativeInfinity: neg,
-//        nan: nan) = self.options.nonConformingFloatEncodingStrategy {
-//        
-//        return (pos, neg, nan)
-//    } else {
-//        return nil
-//    }
-//}
 //
 //func box(_ value: Float) throws -> Any {
 //    return try box(floatingPoint: value)
