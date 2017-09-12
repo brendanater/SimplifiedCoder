@@ -589,8 +589,8 @@ public extension DecoderUnkeyedContainer {
     
     public mutating func superDecoder() throws -> Decoder {
         
-        return try Base(
-            value: self.next(Decoder.self, "value for super decoder"),
+        return Base(
+            value: try self.next(Decoder.self, "value for super decoder"),
             codingPath: self.codingPath + ["super: \(self.currentKey)"],
             options: self.decoder.options,
             userInfo: self.decoder.userInfo
@@ -620,12 +620,15 @@ public extension DecoderUnkeyedContainer where KeyedContainer.Base == Self.Base 
 
 /// a wrapping error to associate a path with an unknown unbox error
 public enum DecodeError: Error {
+    
     case decodeError(Error, atPath: [CodingKey])
+    
     public var error: Error {
         switch self {
         case .decodeError(let error, atPath: _): return error
         }
     }
+    
     public var codingPath: [CodingKey] {
         switch self {
         case .decodeError(_, atPath: let codingPath): return codingPath

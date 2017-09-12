@@ -90,13 +90,17 @@ struct URLEncoder: TopLevelEncoder {
         }
     }
     
-    private class Base: EncoderBase {
+    private class Base: TypedEncoderBase {
         
-        typealias KeyedContainer = URLEncoder.KeyedContainer<String>
-        typealias UnkeyedContainer = URLEncoder.UnkeyedContainer
         typealias Options = URLEncoder.Options
         
+        lazy var keyedContainerContainerType:     EncoderKeyedContainerType.Type = _OrderedDictionary.self
+        lazy var unkeyedContainerContainerType: EncoderUnkeyedContainerType.Type = NSMutableArray.self
+        lazy var unkeyedContainerType:              EncoderUnkeyedContainer.Type = UnkeyedContainer.self
+        lazy var referenceType:                            EncoderReference.Type = Reference.self
+        
         var options: Options
+        
         var userInfo: [CodingUserInfoKey : Any]
         
         required init(options: Options, userInfo: [CodingUserInfoKey : Any]) {
@@ -106,6 +110,10 @@ struct URLEncoder: TopLevelEncoder {
         
         var storage: [(key: CodingKey?, value: Any)] = []
         var key: CodingKey? = nil
+        
+        var codingPath: [CodingKey] {
+            return _codingPath
+        }
         
         // boxing
         
@@ -213,58 +221,67 @@ struct URLEncoder: TopLevelEncoder {
             default: return try reencode(value)
             }
         }
+        
+        func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+            return self.createKeyedContainer(URLEncoder.KeyedContainer<Key>.self)
+        }
     }
     
     private struct KeyedContainer<K: CodingKey>: EncoderKeyedContainer {
         
-        typealias UnkeyedContainer = URLEncoder.UnkeyedContainer
-        typealias Reference = URLEncoder.Reference
-        typealias Base = URLEncoder.Base
         typealias Key = K
-        typealias Container = _OrderedDictionary
         
-        var encoder: URLEncoder.Base
-        var container: Container
+        var encoder: EncoderBase
+        var container: EncoderKeyedContainerType
         var nestedPath: [CodingKey]
         
-        init(encoder: URLEncoder.Base, container: Container, nestedPath: [CodingKey]) {
+        init(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey]) {
             self.encoder = encoder
             self.container = container
             self.nestedPath = nestedPath
         }
         
-        static func initSelf<Key>(encoder: URLEncoder.Base, container: Container, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-            return KeyedEncodingContainer(KeyedContainer<Key>(encoder: encoder, container: container, nestedPath: nestedPath))
+        static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+            return KeyedEncodingContainer(KeyedContainer<Key>.init(encoder: encoder, container: container, nestedPath: nestedPath))
         }
         
-        static var usesStringValue: Bool {
+        var usesStringValue: Bool {
             return true
         }
+        
     }
     
     private struct UnkeyedContainer: EncoderUnkeyedContainer {
         
-        typealias KeyedContainer = URLEncoder.KeyedContainer<String>
-        typealias Reference = URLEncoder.Reference
-        typealias Base = URLEncoder.Base
-        
-        var encoder: URLEncoder.Base
-        var container: NSMutableArray
+        var encoder: EncoderBase
+        var container: EncoderUnkeyedContainerType
         var nestedPath: [CodingKey]
         
-        init(encoder: URLEncoder.Base, container: NSMutableArray, nestedPath: [CodingKey]) {
+        init(encoder: EncoderBase, container: EncoderUnkeyedContainerType, nestedPath: [CodingKey]) {
             self.encoder = encoder
             self.container = container
             self.nestedPath = nestedPath
+        }
+        
+        mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+            return self.createKeyedContainer(KeyedContainer<NestedKey>.self)
         }
     }
     
     private class Reference: Base, EncoderReference {
         
-        typealias Super = URLEncoder.Base
-        
-        var reference: EncoderReferenceValue = .unkeyed(NSMutableArray(), index: 0)
+        var reference: EncoderReferenceValue = .keyed(NSMutableDictionary(), key: "")
         var previousPath: [CodingKey] = []
+        
+        lazy var usesStringValue: Bool = true
+        
+        override var codingPath: [CodingKey] {
+            return _codingPath
+        }
+        
+        deinit {
+            willDeinit()
+        }
     }
 }
 
