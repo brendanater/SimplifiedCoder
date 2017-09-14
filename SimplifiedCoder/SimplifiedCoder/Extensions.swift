@@ -51,13 +51,13 @@ extension String: CodingKey {
     }
 }
 
-protocol CanBeNil {
+public protocol CanBeNil {
     var isNil: Bool {get}
 }
 
-extension NSNull: CanBeNil { var isNil: Bool { return true } }
+extension NSNull: CanBeNil { public var isNil: Bool { return true } }
 extension Optional: CanBeNil {
-    var isNil: Bool {
+    public var isNil: Bool {
         if case .some(let wrapped) = self {
             if let canBeNil = wrapped as? CanBeNil {
                 return canBeNil.isNil
@@ -70,9 +70,11 @@ extension Optional: CanBeNil {
     }
 }
 
-func isNil(_ value: Any?) -> Bool {
+public func isNil(_ value: Any?) -> Bool {
     return value.isNil
 }
+
+
 
 extension NumberFormatter {
     static var shared = NumberFormatter()

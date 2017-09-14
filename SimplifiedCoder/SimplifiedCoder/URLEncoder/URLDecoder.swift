@@ -49,25 +49,25 @@ public struct URLDecoder: TopLevelDecoder {
         boolRepresentation: (true: String, false: String)
     )
     
-    public func decode<T>(_: T.Type, from data: Data) throws -> T where T : Decodable {
+    public func decode<T>(_: T.Type, from value: Data) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.deserialize(unordered: data))
+        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
     }
     
-    public func decode<T>(_: T.Type, from string: String) throws -> T where T : Decodable {
+    public func decode<T>(_: T.Type, from value: String) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.deserialize(unordered: string))
+        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
     }
     
-    public func decode<T>(_: T.Type, from query: [URLQueryItem]) throws -> T where T : Decodable {
+    public func decode<T>(_: T.Type, from value: [URLQueryItem]) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.deserialize(unordered: query))
+        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
     }
     
-    public func decode<T>(_: T.Type, from queryObject: [String: Any]) throws -> T where T : Decodable {
+    public func decode<T>(_: T.Type, from value: [String: Any]) throws -> T where T : Decodable {
         
         return try Base(
-            value: queryObject,
+            value: value,
             codingPath: [],
             options: (
                 self.dateDecodingStrategy,
@@ -80,10 +80,11 @@ public struct URLDecoder: TopLevelDecoder {
         .decode(T.self)
     }
     
-    fileprivate class Base: DecoderBase {
+    fileprivate class Base: TypedDecoderBase {
         
-        typealias KeyedContainer = URLDecoder.KeyedContainer<String>
-        typealias UnkeyedContainer = URLDecoder.UnkeyedContainer
+        // OrderedDictionary is not needed in decoding
+        
+        lazy var unkeyedContainerType: DecoderUnkeyedContainer.Type = UnkeyedContainer.self
         
         typealias Options = URLDecoder.Options
         
@@ -98,6 +99,10 @@ public struct URLDecoder: TopLevelDecoder {
             self.storage = [value]
             self.options = options
             self.userInfo = userInfo
+        }
+        
+        func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
+            return try self.createKeyedContainer(KeyedContainer<Key>.self)
         }
     
         func convert<T: ConvertibleNumber>(number value: Any) throws -> T {
@@ -219,48 +224,42 @@ public struct URLDecoder: TopLevelDecoder {
     
     fileprivate struct KeyedContainer<K: CodingKey>: DecoderKeyedContainer {
         
-        
         typealias Key = K
-        typealias UnkeyedContainer = URLDecoder.UnkeyedContainer
-        typealias Base = URLDecoder.Base
         
-        var decoder: Base
-        var container: NSDictionary
+        var decoder: DecoderBase
+        var container: DecoderKeyedContainerType
         var nestedPath: [CodingKey]
         
-        init(decoder: Base, container: NSDictionary, nestedPath: [CodingKey]) {
+        init(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey]) {
             self.decoder = decoder
             self.container = container
             self.nestedPath = nestedPath
         }
         
-        static func initSelf<NewKey>(decoder: Base, container: NSDictionary, nestedPath: [CodingKey], keyedBy: NewKey.Type) -> KeyedDecodingContainer<NewKey> where NewKey : CodingKey {
-            
-            let _self = KeyedContainer<NewKey>(decoder: decoder, container: container, nestedPath: nestedPath)
-            return KeyedDecodingContainer(_self)
-        }
+        var usesStringValue: Bool = true
         
-        static var usesStringValue: Bool {
-            return true
+        static func initSelf<Key>(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key> where Key : CodingKey {
+            return KeyedDecodingContainer(KeyedContainer<Key>.init(decoder: decoder, container: container, nestedPath: nestedPath))
         }
     }
     
     fileprivate struct UnkeyedContainer: DecoderUnkeyedContainer {
         
-        typealias KeyedContainer = URLDecoder.KeyedContainer<String>
-        typealias Base = URLDecoder.Base
-        
-        var decoder: Base
-        var container: NSArray
+        var decoder: DecoderBase
+        var container: DecoderUnkeyedContainerType
         var nestedPath: [CodingKey]
         
-        init(decoder: Base, container: NSArray, nestedPath: [CodingKey]) {
+        init(decoder: DecoderBase, container: DecoderUnkeyedContainerType, nestedPath: [CodingKey]) {
             self.decoder = decoder
             self.container = container
             self.nestedPath = nestedPath
         }
         
         var currentIndex: Int = 0
+        
+        mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
+            return try self.createKeyedContainer(KeyedContainer<NestedKey>.self)
+        }
         
     }
 }

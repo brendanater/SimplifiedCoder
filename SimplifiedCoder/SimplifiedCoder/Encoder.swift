@@ -94,6 +94,8 @@ public protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     
     func set(_ encoded: Any)
     
+    func willThrowError(_ error: Error) -> Error
+    
     func encode<T>(_ value: T, with box: (T)throws->Any) throws
     
     func encodeNil(            ) throws
@@ -116,8 +118,6 @@ public protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     
     // MARK: encoder.box(_:)
     
-    
-    
     func box(_ value: Void  ) throws -> Any
     func box(_ value: Bool  ) throws -> Any
     func box(_ value: Int   ) throws -> Any
@@ -138,7 +138,7 @@ public protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     
     func reencode(_ value: Encodable) throws -> Any
     
-    func createKeyedContainer<T: EncoderKeyedContainer, Key>(_: T.Type) -> KeyedEncodingContainer<Key> where T.Key == Key
+    func createKeyedContainer<T: EncoderKeyedContainer, Key>(_: T.Type) -> KeyedEncodingContainer<Key>
     
     // public func keyedContainer<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
     //     return self.createKeyedContainer({ EncoderKeyedContainer }<Key>.self)
@@ -164,6 +164,7 @@ public extension EncoderBase {
     }
     
     public var canEncodeNewValue: Bool {
+        // if a key is not set from a container, this will always return false
         return self.key != nil || self.storage.count == 0
     }
     
@@ -186,42 +187,17 @@ public extension EncoderBase {
         self.storage.append((self.removeKey(), encoded))
     }
     
-    /// casts the error to the right type and associates the error with the right codingPath
-    public func error(_ error: Error, with value: Any, atPath codingPath: [CodingKey]) -> Error {
-        
-        if case EncodingError.invalidValue(let value, let context) = error {
-            if codingPath.count > context.codingPath.count {
-                return EncodingError.invalidValue(
-                    value,
-                    EncodingError.Context.init(
-                        codingPath: codingPath,
-                        debugDescription: context.debugDescription,
-                        underlyingError: context.underlyingError
-                    )
-                )
-            } else {
-                return error
-            }
-        } else {
-            return EncodingError.invalidValue(
-                value,
-                EncodingError.Context.init(
-                    codingPath: codingPath,
-                    debugDescription: "Failed to encode value",
-                    underlyingError: error
-                )
-            )
-        }
+    public func willThrowError(_ error: Error) -> Error {
+        // so that the error can be handled without upsetting encode
+        // default does nothing
+        return error
     }
     
     public func encode<T>(_ value: T, with box: (T)throws->Any) throws {
-        
         do {
-            
             try self.set(box(value))
-            
         } catch {
-            throw self.error(error, with: value, atPath: self.codingPath)
+            throw self.willThrowError(error)
         }
     }
     
@@ -286,7 +262,7 @@ public extension EncoderBase {
         return self.storage.removeLast().value
     }
     
-    public func createKeyedContainer<T: EncoderKeyedContainer, Key>(_: T.Type) -> KeyedEncodingContainer<Key> where T.Key == Key {
+    public func createKeyedContainer<T: EncoderKeyedContainer, Key>(_: T.Type) -> KeyedEncodingContainer<Key> {
         
         // If an existing keyed container was already requested, return that one.
         let container: EncoderKeyedContainerType
@@ -298,16 +274,15 @@ public extension EncoderBase {
             self.set(container)
             
         } else {
-            // could just crash here, but checks if the last encoded container is the same type and returns that.
             
-            if let _container = self.storage.last!.value as? EncoderKeyedContainerType {
+            if let _container = self.storage.last?.value as? EncoderKeyedContainerType {
                 container = _container
             } else {
                 preconditionFailure("Attempt to push new keyed encoding container when already previously encoded at this path.")
             }
         }
         
-        return KeyedEncodingContainer(T.init(encoder: self, container: container, nestedPath: []))
+        return T.initSelf(encoder: self, container: container, nestedPath: [], keyedBy: Key.self)
     }
     
     // public func keyedContainer<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
@@ -326,6 +301,7 @@ public extension EncoderBase {
             
         } else {
             // could just crash here, but checks if the last encoded container is the same type and returns that.
+            // warning: if self.key is not set from an encoding container, no new container will be created
             
             if let _container = self.storage.last?.value as? EncoderUnkeyedContainerType {
                 container = _container
@@ -345,12 +321,17 @@ public extension EncoderBase {
 /// has to be a class to set to an already set object
 public protocol EncoderKeyedContainerType: class {
     
-    subscript(key: Any) -> Any? {get set}
+    func set(toStorage value: Any, forKey key: AnyHashable)
     
     init()
 }
 
-extension NSMutableDictionary: EncoderKeyedContainerType {}
+extension NSMutableDictionary: EncoderKeyedContainerType {
+    
+    public func set(toStorage value: Any, forKey key: AnyHashable) {
+        self[key] = value
+    }
+}
 
 // MARK: - Encoding Containers
 public protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
@@ -372,6 +353,8 @@ public protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     var codingPath: [CodingKey] {get}
     
     func set(_ encoded: Any, forKey key: CodingKey)
+    
+    func willThrowError(_ error: Error, forKey key: Key) -> Error
     
     func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws
     
@@ -410,14 +393,24 @@ public extension EncoderKeyedContainer {
     public func set(_ encoded: Any, forKey key: CodingKey) {
         
         if self.usesStringValue {
-
-            self.container[key.stringValue] = encoded
+            
+            self.container.set(toStorage: encoded, forKey: key.stringValue)
 
         } else {
 
             precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
-
-            self.container[key.intValue!] = encoded
+            
+            self.container.set(toStorage: encoded, forKey: key.intValue!)
+        }
+    }
+    
+    public func willThrowError(_ error: Error, forKey key: Key) -> Error {
+        
+        if let error = error as? HasCodingPath & Error {
+            
+            return error.withNestedPath(self.nestedPath + [key])
+        } else {
+            return error
         }
     }
     
@@ -427,7 +420,7 @@ public extension EncoderKeyedContainer {
             try self.set(box(value), forKey: key)
             
         } catch {
-            throw self.encoder.error(error, with: value, atPath: self.codingPath + [key])
+            throw self.willThrowError(error, forKey: key)
         }
     }
     
@@ -514,6 +507,8 @@ public protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     
     var currentKey: CodingKey {get}
     
+    func willThrowError(_ error: Error) -> Error
+    
     func encode<T>(_ value: T, with box: (T)throws->Any) throws
     
     // MARK: - UnkeyedEncodingContainer Methods
@@ -535,7 +530,7 @@ public protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     
     mutating func encode<T : Encodable>(_ value: T) throws
     
-    func createKeyedContainer<T: EncoderKeyedContainer, NestedKey>(_: T.Type) -> KeyedEncodingContainer<NestedKey> where T.Key == NestedKey
+    func createKeyedContainer<T: EncoderKeyedContainer, NestedKey>(_: T.Type) -> KeyedEncodingContainer<NestedKey>
     
     //public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
     //
@@ -563,13 +558,24 @@ public extension EncoderUnkeyedContainer {
         return "index: \(self.count)"
     }
     
+    public func willThrowError(_ error: Error) -> Error {
+        
+        if let error = error as? HasCodingPath & Error {
+            
+            return error.withNestedPath(self.nestedPath + [self.currentKey])
+        } else {
+            return error
+        }
+    }
+    
     public func encode<T>(_ value: T, with box: (T)throws->Any) throws {
         
         do {
             try self.container.add(box(value))
             
         } catch {
-            throw self.encoder.error(error, with: value, atPath: self.codingPath + [self.currentKey])
+            // because the containers have a nestedPath, they need to set it to the errors with a codingPath
+            throw self.willThrowError(error)
         }
     }
     
@@ -593,12 +599,12 @@ public extension EncoderUnkeyedContainer {
     // remember to set key to encoder.key before calling encoder.reencode(Encodable) after the initial container was added, or the encoder won't know that a value has been added with a codingPath.
     public mutating func encode<T : Encodable>(_ value: T) throws { self.encoder.key = self.currentKey ; try encode(value as Encodable, with: encoder.box(_:)) }
     
-    public func createKeyedContainer<T: EncoderKeyedContainer, NestedKey>(_: T.Type) -> KeyedEncodingContainer<NestedKey> where T.Key == NestedKey {
+    public func createKeyedContainer<T: EncoderKeyedContainer, NestedKey>(_: T.Type) -> KeyedEncodingContainer<NestedKey> {
         
         let container = self.encoder.keyedContainerContainerType.init()
         self.container.add(container)
         
-        return KeyedEncodingContainer(T.init(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [self.currentKey]))
+        return T.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [self.currentKey], keyedBy: NestedKey.self)
     }
     
     //public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
@@ -688,14 +694,14 @@ extension EncoderReference {
         case .keyed(let container, key: let key):
             
             if self.usesStringValue {
-
-                container[key.stringValue] = encoded
+                
+                container.set(toStorage: encoded, forKey: key.stringValue)
                 
             } else {
                 
                 precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
-
-                container[key.intValue!] = encoded
+                
+                container.set(toStorage: encoded, forKey: key.intValue!)
             }
         }
     }

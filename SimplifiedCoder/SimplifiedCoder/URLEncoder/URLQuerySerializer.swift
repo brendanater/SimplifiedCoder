@@ -55,262 +55,346 @@ public struct URLQuerySerializer {
     
     public init() {}
     
-    /// A generic error that something happend in parsing the query.
-    /// Too many different errors.
-    public enum QueryParsingError: Error {
-        case queryParsingError(String)
+    public enum ToQueryError: Error {
+        
+        case nestedContainerInArray
+        case invalidKey(String, reason: String)
+        case invalidQueryObject(Any, reason: String)
     }
     
-    /// T.Element must be exactly: (key: String, value: Any) ((String, Any) will not work, (key: String, value: Int) will not work)
-    public func serialize<T: Sequence>(_ sequence: T) throws -> [URLQueryItem] where T.Element == (key: String, value: Any) {
+    public enum FromQueryError: Error {
+        
+        case invalidName(String, reason: String)
+        case duplicateValueForName
+        case failedToGetQueryItems(query: String)
+    }
+    
+    // MARK: serialization
+    
+    public func queryData(from value: Any) throws -> Data {
+        
+        let query = try self.query(from: value)
+        
+        if let data = query.data(using: .utf8, allowLossyConversion: false) {
+            return data
+        } else {
+            throw ToQueryError.invalidQueryObject(value, reason: "Could not convert query to Data. Query: \(query)")
+        }
+    }
+    
+    public func query(from value: Any) throws -> String {
+        
+        return try queryItems(from: value).map { "\($0.name)=\($0.value ?? "")"}.joined(separator: "&")
+    }
+    
+    /// pass result to a URLComponents.queryItems to add to a URL
+    public func queryItems(from value: Any) throws -> [URLQueryItem] {
+        
+        try assertValidObject(value)
         
         var query: [URLQueryItem] = []
         
-        for (key, value) in sequence {
-            try self.queryComponents(fromKey: key, value: value, to: &query)
+        if let value = value as? [String: Any] {
+            
+            for (name, value) in value {
+                
+                try self._queryItems(name: name, value: value, to: &query)
+            }
+            
+        } else if let value = value as? [(String, Any)] {
+            
+            for (name, value) in value {
+                
+                try self._queryItems(name: name, value: value, to: &query)
+            }
+            
+        } else {
+            fatalError("URLQuerySerializer.assertValidObject(_:) did not catch an invalid top-level object: \(value) of type: \(type(of: value))")
         }
         
         return query
     }
     
-    /// T.Element must be exactly: (key: String, value: Any) ((String, Any) will not work, (key: String, value: Int) will not work)
-    public func serialize<T: Sequence>(toString sequence: T) throws -> String where T.Element == (key: String, value: Any) {
+    private func _queryItems(name: String, value: Any, to query: inout [URLQueryItem]) throws {
         
-        return try serialize(sequence).map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
-    }
-    
-    /// T.Element must be exactly: (key: String, value: Any) ((String, Any) will not work, (key: String, value: Int) will not work)
-    public func serialize<T: Sequence>(toData sequence: T) throws -> Data where T.Element == (key: String, value: Any) {
-        
-        let string = try serialize(toString: sequence)
-        
-        if let data = string.data(using: .utf8) {
-            return data
-        } else {
-            throw QueryParsingError.queryParsingError("Failed to parse to data, string: \(string)")
-        }
-    }
-    
-    public func deserialize(_ query: [URLQueryItem]) throws -> [(name: String, value: Any)] {
-        
-        return try self.object(from: query)
-    }
-    
-    public func deserialize(unordered query: [URLQueryItem]) throws -> [String: Any] {
-        
-        return self._unordered(try deserialize(query)) as! [String: Any]
-    }
-    
-    public func deserialize(_ query: String) throws -> [(name: String, value: Any)] {
-        
-        if let url = URL(string: "notAURL.com/" + query), let components = URLComponents(url: url, resolvingAgainstBaseURL: false), let queryItems = components.queryItems {
+        if let value = value as? [String: Any] {
             
-            return try deserialize(queryItems)
-            
-        } else {
-            throw QueryParsingError.queryParsingError("Failed to convert to query, string: \(query)")
-        }
-    }
-    
-    public func deserialize(unordered query: String) throws -> [String: Any] {
-        
-        return self._unordered(try deserialize(query)) as! [String: Any]
-    }
-    
-    public func deserialize(_ query: Data) throws -> [(name: String, value: Any)] {
-        
-        if let string = String(data: query, encoding: .utf8) {
-            return try deserialize(string)
-        } else {
-            throw QueryParsingError.queryParsingError("Failed to deserialize data")
-        }
-    }
-    
-    public func deserialize(unordered query: Data) throws -> [String: Any] {
-        
-        return self._unordered(try deserialize(query)) as! [String: Any]
-    }
-    
-    // MARK - serialization
-    
-    internal func queryComponents(fromKey key: String, value: Any, to query: inout [URLQueryItem]) throws {
-        
-        if key == "" {
-            throw QueryParsingError.queryParsingError("Cannot have an empty key, parsed: \(query)")
-        }
-        
-        func set(_ name: String, _ value: String?) throws {
-            
-            if name == "" {
-                throw QueryParsingError.queryParsingError("Cannot have an empty name (parsed: \"\(key)\")")
+            if name.hasSuffix("[]") {
+                throw ToQueryError.nestedContainerInArray
             }
             
-            if let value = value {
-                try query.append(URLQueryItem(name: escape(name), value: escape(value)))
+            for (key, value) in value {
+                
+                try self._queryItems(name: name + "[\(key)]", value: value, to: &query)
+            }
+        
+        } else if let value = value as? [(String, Any)] {
+            
+            if name.hasSuffix("[]") {
+                throw ToQueryError.nestedContainerInArray
+            }
+            
+            for (nestedKey, value) in value {
+                
+                try self._queryItems(name: name + "[\(nestedKey)]", value: value, to: &query)
+            }
+            
+        } else if let value = value as? NSArray {
+            
+            if name.hasSuffix("[]") {
+                throw ToQueryError.nestedContainerInArray
+            }
+            
+            for value in value {
+                
+                try self._queryItems(name: name + "[]", value: value, to: &query)
+            }
+            
+        } else if let value = value as? NSNumber {
+            
+            // one way to tell if a NSNumber is a Bool.
+            if type(of: value) == objcBoolType {
+                
+                query.append(URLQueryItem(name: name, value: (value.boolValue ? boolRepresentation.true : boolRepresentation.false)))
+                
             } else {
-                try query.append(URLQueryItem(name: escape(name), value: nil))
-            }
-        }
-        
-        if isNil(value) {
-            
-            try set(key, "")
-            
-        } else if let bool = value as? Bool {
-            
-            try set(key, (bool ? boolRepresentation.true : boolRepresentation.false))
-            
-        } else if let dictionary = value as? [String: Any] {
-            
-            for (nestedKey, value) in dictionary {
                 
-                if nestedKey == "" {
-                    throw QueryParsingError.queryParsingError("Dictionary keys cannot be nil, at: \(key)")
-                }
-                
-                if key.hasSuffix("[]") {
-                    throw QueryParsingError.queryParsingError("Cannot nest a container in an array with a standard url query")
-                }
-                
-                try queryComponents(fromKey: "\(key)[\(nestedKey)]", value: value, to: &query)
+                query.append(URLQueryItem(name: name, value: value.description))
             }
             
-        } else if let dictionary = value as? [(nestedKey: String, value: Any)] {
+        } else if let value = value as? String {
             
-            for (nestedKey, value) in dictionary {
-                
-                if nestedKey == "" {
-                    throw QueryParsingError.queryParsingError("Dictionary keys cannot be nil, at: \(key)")
-                }
-                
-                if key.hasSuffix("[]") {
-                    throw QueryParsingError.queryParsingError("Cannot nest a container in an array with a standard url query")
-                }
-                
-                try queryComponents(fromKey: "\(key)[\(nestedKey)]", value: value, to: &query)
-            }
-            
-        } else if let array = value as? [Any] {
-            
-            if key.hasSuffix("[]") {
-                throw QueryParsingError.queryParsingError("Cannot nest a container in an array with a standard url query")
-            }
-            
-            for value in array {
-                try queryComponents(fromKey: "\(key)[]", value: value, to: &query)
-            }
+            query.append(URLQueryItem(name: name, value: value))
             
         } else {
             
-            try set(key, "\(value)")
+            precondition(isNil(value), "Uncaught value: \(value) of type: \(type(of: value)). URLQuerySerializer.queryComponents(from:) did not catch a valid value")
+            
+            query.append(URLQueryItem(name: name, value: nil))
         }
     }
     
-    /// Returns a percent-escaped string following RFC 3986 for a query string key or value.
-    ///
-    /// RFC 3986 states that the following characters are "reserved" characters.
-    ///
-    /// - General Delimiters: ":", "#", "[", "]", "@", "?", "/"
-    /// - Sub-Delimiters: "!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "="
-    ///
-    /// In RFC 3986 - Section 3.4, it states that the "?" and "/" characters should not be escaped to allow
-    /// query strings to include a URL. Therefore, all "reserved" characters with the exception of "?" and "/"
-    /// should be percent-escaped in the query string.
-    ///
-    /// - parameter string: The string to be percent-escaped.
-    ///
-    /// - returns: The percent-escaped string.
-    internal func escape(_ string: String) throws -> String {
+    // MARK: isValidObject
+    
+    public func isValidObject(_ value: Any, printError: Bool = false) -> Bool {
         
-        let generalDelimiters = ":#[]@"
-        let subDelimiters = "!$&'()*+,;="
-        
-        var allowedCharacters = CharacterSet.urlQueryAllowed
-        allowedCharacters.remove(charactersIn: generalDelimiters + subDelimiters)
-        
-        if #available(iOS 8.1, *) {
+        do {
+            try assertValidObject(value)
             
-            if let string = string.addingPercentEncoding(withAllowedCharacters: allowedCharacters) {
-                return string
-            } else {
-                throw QueryParsingError.queryParsingError(string)
+            return true
+            
+        } catch {
+            
+            if printError {
+                print(error)
             }
             
-        } else {
-            var escaped = ""
+            return false
+        }
+    }
+    
+    /// keys cannot contain these characters
+    private var _str = "[]#&="
+    
+    public func assertValidObject(_ value: Any) throws {
+        
+        if let value = value as? [String: Any] {
             
-            let batchSize = 1
-            
-            var startIndex = string.startIndex
-            
-            while startIndex < string.endIndex {
+            for (key, value) in value {
                 
-                if let endIndex = string.index(startIndex, offsetBy: batchSize, limitedBy: string.endIndex) {
-                    
-                    if let substring = string.substring(with: startIndex..<endIndex).addingPercentEncoding(withAllowedCharacters: allowedCharacters) {
-                        
-                        escaped.append(substring)
-                        
-                        startIndex = endIndex
-                        
-                        continue
+                for c in key {
+                    if _str.contains(c) {
+                        throw ToQueryError.invalidKey(key, reason: "Key: \(key) cannot contain [, ], #, &, or =")
                     }
                 }
                 
-                throw QueryParsingError.queryParsingError(string)
+                if key == "" {
+                    throw ToQueryError.invalidKey(key, reason: "Dictionary keys cannot be empty.")
+                }
+                
+                try _assertValidObject(value)
             }
             
-            return escaped
+        } else if let value = value as? [(String, Any)] {
+            
+            for (key, value) in value {
+                
+                for c in key {
+                    if _str.contains(c) {
+                        throw ToQueryError.invalidKey(key, reason: "Key: \(key) cannot contain [, ], #, &, or =")
+                    }
+                }
+                
+                if key == "" {
+                    throw ToQueryError.invalidKey(key, reason: "Dictionary keys cannot be empty.")
+                }
+                
+                try _assertValidObject(value)
+            }
+            
+        } else {
+            
+            throw ToQueryError.invalidQueryObject(value, reason: "Invalid top-level object. Top-level object must be: [String: Any] or [(String, Any)]")
+        }
+    }
+    
+    private func _assertValidObject(_ value: Any) throws {
+        
+        if value as? NSNumber != nil {
+            return
+            
+        } else if value as? NSString != nil {
+            return
+            
+        } else if isNil(value) {
+            return
+            
+        } else if let value = value as? [String: Any] {
+            
+            for (key, value) in value {
+                
+                for c in key {
+                    if _str.contains(c) {
+                        throw ToQueryError.invalidKey(key, reason: "Key: \(key) cannot contain [, ], #, &, or =")
+                    }
+                }
+                
+                if key == "" {
+                    throw ToQueryError.invalidKey(key, reason: "Dictionary keys cannot be empty.")
+                }
+                
+                try _assertValidObject(value)
+            }
+            
+        } else if let value = value as? [(String, Any)] {
+            
+            for (key, value) in value {
+                
+                for c in key {
+                    if _str.contains(c) {
+                        throw ToQueryError.invalidKey(key, reason: "Key: \(key) cannot contain [, ], #, &, or =")
+                    }
+                }
+                
+                if key == "" {
+                    throw ToQueryError.invalidKey(key, reason: "Dictionary keys cannot be empty.")
+                }
+                
+                try _assertValidObject(value)
+            }
+            
+        } else if let value = value as? NSArray {
+            
+            for value in value {
+                try _assertValidObject(value)
+            }
+            
+        } else {
+            
+            throw ToQueryError.invalidQueryObject(value, reason: "Unsupported value. Value must be: [String: Any], [(String, Any)], NSArray, Bool, NSNumber, NSString, or isNil(_:)")
         }
     }
     
     // MARK - deserialization
     
-    internal func object(from query: [URLQueryItem]) throws -> [(name: String, value: Any)] {
+    private enum Component {
+        case array
+        case dictionary(key: String)
+    }
+    
+    // Data
+    
+    public func objectUnordered(from query: Data) throws -> [String: Any] {
+        
+        return try self.object(from: query)._unordered()
+    }
+    
+    public func object(from query: Data) throws -> [(key: String, value: Any)] {
+        
+        return try self.object(from: query.base64EncodedString())
+    }
+    
+    // String
+    
+    public func objectUnordered(from query: String) throws -> [String: Any] {
+        
+        return try self.object(from: query)._unordered()
+    }
+    
+    public func object(from query: String) throws -> [(key: String, value: Any)] {
+        
+        if let url = URL(string: "notAURL.com/"), var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            
+            components.query = query
+            
+            return try self.object(from: components.queryItems ?? [])
+            
+        } else {
+            
+            throw FromQueryError.failedToGetQueryItems(query: query)
+        }
+    }
+    
+    // Array<QueryItem>
+    
+    public func objectUnordered(from query: [URLQueryItem]) throws -> [String: Any] {
+        
+        return try self.object(from: query)._unordered()
+    }
+    
+    public func object(from query: [URLQueryItem]) throws -> [(key: String, value: Any)] {
         
         var values: _URLQueryDictionary<[([Component], String?)]> = [:]
         
         for item in query {
+            
             let name = item.name
             let value = item.value
             
+            // name components
+            
             if name.contains("[") {
-                guard name.starts(with: "[") == false || name.starts(with: "]") == false else {
-                    throw QueryParsingError.queryParsingError("Name: \(name) cannot start with an open or close bracket")
-                }
                 
-                guard name.last! == "]" else {
-                    throw QueryParsingError.queryParsingError("Name: \(name) (with an opening bracket) does not end with a closing bracket")
+                guard _str.contains(name.first!) == false else {
+                    throw FromQueryError.invalidName(name, reason: "Cannot start with [, ], #, &, or =")
                 }
                 
                 guard name.countInstances(of: "[") == name.countInstances(of: "]") else {
-                    throw QueryParsingError.queryParsingError("Name: \(name) does not have equal number of open and close brackets")
+                    throw FromQueryError.invalidName(name, reason: "Does not have equal number of open and close brackets")
                 }
                 
-                var components = [Component]()
+                var components: [Component] = []
                 
                 var subComponents = name.split(separator: "[").map { String($0) }
                 
                 let key = subComponents.removeFirst()
                 
                 guard key.contains("]") == false else {
-                    throw QueryParsingError.queryParsingError("Name: \(name) cannot start with a closing bracket")
+                    throw FromQueryError.invalidName(name, reason: "Cannot start with a closing bracket")
                 }
+                
+                var hasSetArrayComponent = false
                 
                 for var component in subComponents {
                     
-                    guard component.last == "]" else {
-                        throw QueryParsingError.queryParsingError("component does not end with a closing bracket")
+                    if hasSetArrayComponent {
+                        throw FromQueryError.invalidName(name, reason: "Cannot have a nested container in an array")
                     }
                     
+                    guard component.last == "]" else {
+                        throw FromQueryError.invalidName(name, reason: "Component: \(component) does not end with a closing bracket")
+                    }
+                    
+                    // remove closing bracket
                     component.removeLast()
                     
                     if component.contains("]") {
-                        throw QueryParsingError.queryParsingError("component has more than one closing bracket")
+                        throw FromQueryError.invalidName(name, reason: "Component: \(component) had more than one closing bracket")
                     }
                     
                     if component == "" {
                         components.append(.array)
+                        hasSetArrayComponent = true
                     } else {
                         components.append(.dictionary(key: component))
                     }
@@ -329,9 +413,7 @@ public struct URLQuerySerializer {
     
     private func combine(_ values: [(components: [Component], value: String?)]) throws -> Any {
         
-        guard values.count > 0 else {
-            throw QueryParsingError.queryParsingError("no values to combine, need at least one")
-        }
+        // guaranteed to have at least one value
         
         if let type = values.first?.components.first {
             
@@ -340,11 +422,7 @@ public struct URLQuerySerializer {
             case .array:
                 // first component is array
                 
-                // no other items are nested
-                
-                guard (values.filter { $0.components.count > 1 }.count == 0) else {
-                    throw QueryParsingError.queryParsingError("cannot have a nested array or dictionary in an array")
-                }
+                // no nested containers (should be handled by .object(from:))
                 
                 return try values.map { (value) throws -> String? in
                     
@@ -355,7 +433,7 @@ public struct URLQuerySerializer {
                         return value.value
                         
                     } else {
-                        throw QueryParsingError.queryParsingError("mismatch component type expected array")
+                        throw FromQueryError.duplicateValueForName
                     }
                 }
                 
@@ -370,13 +448,14 @@ public struct URLQuerySerializer {
                     // all other values are dict
                     if let c = components.first, case .dictionary(let key) = c {
                         
+                        // remove first component
                         components.removeFirst()
                         
-                        // filter out key / return value
+                        // combine values
                         _values.append((components, value), forKey: key)
                         
                     } else {
-                        throw QueryParsingError.queryParsingError("mismatch component type expected dictionary")
+                        throw FromQueryError.duplicateValueForName
                     }
                 }
                 
@@ -384,68 +463,67 @@ public struct URLQuerySerializer {
             }
             
         } else {
-            // first component is nil
+            // no component
             
             // no other values
             guard values.count == 1 else {
-                throw QueryParsingError.queryParsingError("duplicate value for key")
+                throw FromQueryError.duplicateValueForName
             }
             
             // return value
             return values.first?.value as Any
         }
     }
-    
-    private func _unordered(_ value: Any) -> Any {
-        
-        if let value = value as? [(String, Any)] {
-            
-            var result: [String: Any] = [:]
-            for (key, value) in value {
-                result[key] = self._unordered(value)
-            }
-            return result
-            
-        } else if let value = value as? [Any] {
-            return value.map { self._unordered($0) }
-            
-        } else {
-            return value
-        }
-    }
 }
 
-fileprivate struct _URLQueryDictionary<V>: OrderedDictionaryProtocol {
+fileprivate var objcBoolType = type(of: true as NSNumber)
+
+fileprivate struct _URLQueryDictionary<V>: ExpressibleByDictionaryLiteral {
+    
     typealias Key = String
     typealias Value = V
     typealias Element = (key: Key, value: Value)
     
-    var elements: [(key: Key, value: Value)]
+    var elements: [Element]
     
-    init() {
-        self.elements = []
-    }
-    
-    init(_ elements: [Element]) {
+    init(dictionaryLiteral elements: (String, V)...) {
         self.elements = elements
     }
-}
-
-extension Dictionary where Value: Sequence & ExpressibleByArrayLiteral & RangeReplaceableCollection {
     
-    mutating func append(_ value: Value.Element, to key: Key) {
+    subscript(key: Key) -> Value? {
         
-        var element = self[key] ?? []
+        get {
+            return self.elements.first(where: { $0.key == key })?.value
+        }
         
-        element.append(value)
-        
-        self[key] = element
+        set {
+    
+            if let newValue = newValue {
+    
+                if let index = self.elements.index(where: { $0.key == key }) {
+                    self.elements.remove(at: index)
+    
+                    self.elements.insert((key, newValue), at: index)
+                } else {
+                    self.elements.append((key, newValue))
+                }
+            } else {
+                self.elements.popFirst(where: { $0.key == key })
+            }
+        }
     }
 }
 
-enum Component {
-    case array
-    case dictionary(key: String)
+extension _URLQueryDictionary where Value: Sequence & ExpressibleByArrayLiteral & RangeReplaceableCollection {
+
+    mutating func append(_ value: Value.Element, forKey key: String) {
+
+        var element = self[key] ?? []
+
+        element.append(value)
+
+        self[key] = element
+    }
 }
 
 extension Array {
@@ -489,6 +567,40 @@ extension String {
             count += 1
         }
         return count
+    }
+}
+
+extension Array {
+    
+    fileprivate func _unordered(_ value: Any) -> Any {
+        
+        if let value = value as? [(AnyHashable, Any)] {
+            
+            var result: [AnyHashable: Any] = [:]
+            
+            for (key, value) in value {
+                
+                result[key] = self._unordered(value)
+            }
+            
+            return result
+            
+        } else if let value = value as? [Any] {
+            
+            return value.map(self._unordered(_:))
+            
+        } else {
+            return value
+        }
+    }
+}
+
+fileprivate extension Array where Element == (key: String, value: Any) {
+    
+    /// converts self and any nested tuple arrays to a dictionary
+    func _unordered() -> [String: Any] {
+        
+        return self._unordered(self) as! [String: Any]
     }
 }
 

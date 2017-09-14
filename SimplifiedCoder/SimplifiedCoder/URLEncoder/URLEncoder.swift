@@ -42,63 +42,57 @@ struct URLEncoder: TopLevelEncoder {
         nonConformingFloatEncodingStrategy: JSONEncoder.NonConformingFloatEncodingStrategy
     )
     
-    enum Error: Swift.Error {
-        case incorrectTopLevelObject(Any, ofType: Any.Type)
+    enum URLEncoderError: Swift.Error {
+        case incorrectTopLevelObject(Any)
         case cannotEncodeToData(queryString: String)
     }
     
     func encode(_ value: Encodable) throws -> Data {
         
-        let string = try encode(asQueryString: value)
-        
-        guard let data = string.data(using: .utf8, allowLossyConversion: false) else {
-            throw Error.cannotEncodeToData(queryString: string)
-        }
-        
-        return data
+        return try self.serializer.queryData(from: self.encode(asObject: value))
     }
     
-    func encode(asQueryString value: Encodable) throws -> String {
+    func encode(asQuery value: Encodable) throws -> String {
         
-        var components: URLComponents = URLComponents(url: URL(string: "notAURL.com/")!, resolvingAgainstBaseURL: false)!
-        
-        components.queryItems = try encode(asQuery: value)
-        
-        return components.query!
+        return try self.serializer.query(from: self.encode(asObject: value))
     }
     
-    func encode(asQuery value: Encodable) throws -> [URLQueryItem] {
+    func encode(asQueryItems value: Encodable) throws -> [URLQueryItem] {
+        
+        return try self.serializer.queryItems(from: self.encode(asObject: value))
+    }
+    
+    func encode(asObject value: Encodable) throws -> [(key: String, value: Any)] {
         
         let encoder = Base(
             options: (
-                dateEncodingStrategy,
-                dataEncodingStrategy,
-                nonConformingFloatEncodingStrategy
+                self.dateEncodingStrategy,
+                self.dataEncodingStrategy,
+                self.nonConformingFloatEncodingStrategy
             ),
-            userInfo: userInfo
+            userInfo: self.userInfo
         )
         
         let value = try encoder.box(value)
         
-        if let container = (value as? _OrderedDictionary)?.elements as? [(key: String, value: Any)] {
+        if let container = (value as? _OrderedDictionary)?.baseType() {
             
-            return try serializer.serialize(container)
+            return container
             
         } else {
             
-            throw Error.incorrectTopLevelObject(value, ofType: type(of: value))
+            throw URLEncoderError.incorrectTopLevelObject(value)
         }
     }
     
     private class Base: TypedEncoderBase {
         
+        lazy var keyedContainerContainerType: EncoderKeyedContainerType.Type = _OrderedDictionary.self
+        
+        lazy var unkeyedContainerType: EncoderUnkeyedContainer.Type = UnkeyedContainer.self
+        lazy var referenceType: EncoderReference.Type = Reference.self
+        
         typealias Options = URLEncoder.Options
-        
-        lazy var keyedContainerContainerType:     EncoderKeyedContainerType.Type = _OrderedDictionary.self
-        lazy var unkeyedContainerContainerType: EncoderUnkeyedContainerType.Type = NSMutableArray.self
-        lazy var unkeyedContainerType:              EncoderUnkeyedContainer.Type = UnkeyedContainer.self
-        lazy var referenceType:                            EncoderReference.Type = Reference.self
-        
         var options: Options
         
         var userInfo: [CodingUserInfoKey : Any]
@@ -248,7 +242,6 @@ struct URLEncoder: TopLevelEncoder {
         var usesStringValue: Bool {
             return true
         }
-        
     }
     
     private struct UnkeyedContainer: EncoderUnkeyedContainer {
@@ -289,78 +282,58 @@ fileprivate enum _FloatingPointError<T: FloatingPoint>: Error {
     case invalidFloatingPoint(T)
 }
 
-fileprivate final class _OrderedDictionary: OrderedDictionaryProtocol, EncoderKeyedContainerType {
+/// needed order for query and a tupleArray was too hard to use.
+/// before using value, call baseType()
+fileprivate final class _OrderedDictionary: EncoderKeyedContainerType {
     
-    typealias Key = AnyHashable
-    typealias Value = Any
+    typealias Element = (key: String, value: Any)
+    typealias Elements = [Element]
 
-    typealias Element = (key: Key, value: Value)
-
-    var elements: [Element]
+    var elements: Elements
 
     init() {
         self.elements = []
     }
-
-    init(_ elements: [Element]) {
-        self.elements = elements
+    
+    func set(toStorage value: Any, forKey key: AnyHashable) {
+        
+        let key = key as! String
+        
+        if let index = self.elements.index(where: { $0.key == key }) {
+            self.elements.remove(at: index)
+            
+            self.elements.insert((key, value), at: index)
+        } else {
+            self.elements.append((key, value))
+        }
     }
     
-    subscript(key: Any) -> Any? {
-        get {
-            return self[key as! AnyHashable]
-        }
-        set {
-            self[key as! AnyHashable] = newValue
+    /// casts all _OrderedDictionaries to Tuple-Arrays
+    func baseType() -> Elements {
+        return baseType(self.elements) as! Elements
+    }
+    
+    func baseType(_ value: Any) -> Any {
+        
+        if let value = value as? _OrderedDictionary {
+            
+            return value.baseType()
+            
+        } else if let value = value as? Elements {
+            
+            return value.map { ($0, self.baseType($1)) }
+            
+        } else if let value = value as? NSArray {
+            
+            return value.map(self.baseType(_:))
+            
+        } else {
+            
+            return value
+            
         }
     }
 }
-
-
-//fileprivate class <K: Hashable, V>: OrderedDictionaryProtocol, EncoderKeyedContainerType {
-//
-//
-//    typealias Key = K
-//    typealias Value = V
-//
-//    typealias Element = (key: Key, value: Value)
-//
-//    var elements: [Element]
-//
-//    required init() {
-//        self.elements = []
-//    }
-//
-//    required init(_ elements: [Element]) {
-//        self.elements = elements
-//    }
-//
-//    subscript(key: Any) -> Any? {
-//
-//        get {
-//            return self[key as! Key]
-//        }
-//        set {
-//            self[key as! Key] = newValue as! Value?
-//        }
-//    }
-//}
-
-//fileprivate protocol _K: EncoderKeyedContainerType {
-//
-//}
-//
-//extension OrderedDictionary: _K {
-//
-//    subscript(key: Any) -> Any? {
-//        get {
-//            return self[key as! Key]
-//        }
-//        set {
-//            self[key as! Key] = newValue as! Value?
-//        }
-//    }
-//}
 
 
 
