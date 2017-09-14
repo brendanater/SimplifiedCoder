@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		4968F0421F53109500DC43C0 /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4968F0411F53109500DC43C0 /* Decoder.swift */; };
-		8B6A36911F60B05300C25977 /* OrderedDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368D1F60B05300C25977 /* OrderedDictionary.swift */; };
 		8B6A36921F60B05300C25977 /* URLEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368E1F60B05300C25977 /* URLEncoder.swift */; };
 		8B6A36931F60B05300C25977 /* URLDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368F1F60B05300C25977 /* URLDecoder.swift */; };
 		8B6A36941F60B05300C25977 /* URLQuerySerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A36901F60B05300C25977 /* URLQuerySerializer.swift */; };
@@ -37,7 +36,6 @@
 
 /* Begin PBXFileReference section */
 		4968F0411F53109500DC43C0 /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
-		8B6A368D1F60B05300C25977 /* OrderedDictionary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OrderedDictionary.swift; sourceTree = "<group>"; };
 		8B6A368E1F60B05300C25977 /* URLEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLEncoder.swift; sourceTree = "<group>"; };
 		8B6A368F1F60B05300C25977 /* URLDecoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLDecoder.swift; sourceTree = "<group>"; };
 		8B6A36901F60B05300C25977 /* URLQuerySerializer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLQuerySerializer.swift; sourceTree = "<group>"; };
@@ -79,7 +77,6 @@
 		8B6A368C1F60AFCA00C25977 /* URLEncoder */ = {
 			isa = PBXGroup;
 			children = (
-				8B6A368D1F60B05300C25977 /* OrderedDictionary.swift */,
 				8B6A368F1F60B05300C25977 /* URLDecoder.swift */,
 				8B6A368E1F60B05300C25977 /* URLEncoder.swift */,
 				8B6A36901F60B05300C25977 /* URLQuerySerializer.swift */,
@@ -248,7 +245,6 @@
 				8B9B0BA71F58CBAB005883C3 /* Decoder Helpful Methods.swift in Sources */,
 				8B6A36921F60B05300C25977 /* URLEncoder.swift in Sources */,
 				8B6A36931F60B05300C25977 /* URLDecoder.swift in Sources */,
-				8B6A36911F60B05300C25977 /* OrderedDictionary.swift in Sources */,
 				8B6A36941F60B05300C25977 /* URLQuerySerializer.swift in Sources */,
 				8B9B0BA91F58CD1C005883C3 /* Encoder Helpful Methods.swift in Sources */,
 				8B9B0BA51F589C56005883C3 /* Extensions.swift in Sources */,
