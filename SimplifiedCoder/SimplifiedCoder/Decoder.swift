@@ -63,9 +63,6 @@ public protocol DecoderBase: class, Decoder, SingleValueDecodingContainer {
     
     // references
     
-    var keyedContainerContainerType: DecoderKeyedContainerType.Type {get}
-    var unkeyedContainerContainerType: DecoderUnkeyedContainerType.Type {get}
-    
     var unkeyedContainerType: DecoderUnkeyedContainer.Type {get}
     
     // required
@@ -113,13 +110,6 @@ public protocol DecoderBase: class, Decoder, SingleValueDecodingContainer {
 }
 
 public extension DecoderBase {
-    
-    var keyedContainerContainerType: DecoderKeyedContainerType.Type {
-        return NSDictionary.self
-    }
-    var unkeyedContainerContainerType: DecoderUnkeyedContainerType.Type {
-        return NSArray.self
-    }
     
     // MARK: decode single value
     
@@ -262,11 +252,19 @@ public extension DecoderBase {
         return decoded
     }
     
+    public func keyedContainer(from value: Any) -> DecoderKeyedContainerType? {
+        return value as? NSDictionary
+    }
+    
+    public func unkeyedContainer(from value: Any) -> DecoderUnkeyedContainerType? {
+        return value as? NSArray
+    }
+    
     public func createKeyedContainer<T: DecoderKeyedContainer, Key>(_: T.Type) throws -> KeyedDecodingContainer<Key> {
 
-        let value = self.storage.last as Any
-
-        guard let container = underlyingValue(value) as? DecoderKeyedContainerType else {
+        let value = underlyingValue(self.storage.last)
+        
+        guard let container = self.keyedContainer(from: value) else {
             throw self.willThrowError(self.failedToUnbox(value, to: KeyedDecodingContainer<Key>.self, "keyed container"))
         }
 
@@ -284,9 +282,9 @@ public extension DecoderBase {
     
     public func unkeyedContainer() throws -> UnkeyedDecodingContainer {
 
-        let value = self.storage.last as Any
+        let value = underlyingValue(self.storage.last)
 
-        guard let container = underlyingValue(value) as? DecoderUnkeyedContainerType else {
+        guard let container = self.unkeyedContainer(from: value) else {
             throw self.willThrowError(self.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "unkeyed container"))
         }
 
@@ -396,7 +394,7 @@ public extension DecoderKeyedContainer {
         
         let value = try? self.value(forKey: key)
         
-        return value as Any
+        return underlyingValue(value)
     }
     
     public func contains(_ key: Key) -> Bool {
@@ -448,7 +446,7 @@ public extension DecoderKeyedContainer {
         
         let value = try self.value(forKey: key)
         
-        guard let container = underlyingValue(value) as? DecoderKeyedContainerType else {
+        guard let container = self.decoder.keyedContainer(from: value) else {
             throw self.willThrowError(self.decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container"), forKey: key)
         }
         
@@ -460,7 +458,7 @@ public extension DecoderKeyedContainer {
 
         let value = try self.value(forKey: key)
 
-        guard let container = value as? NSArray else {
+        guard let container = self.decoder.unkeyedContainer(from: value) else {
             throw self.willThrowError(self.decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container"), forKey: key)
         }
 
@@ -619,7 +617,7 @@ public extension DecoderUnkeyedContainer {
 
         let value = try self.next(KeyedDecodingContainer<NestedKey>.self, "nested keyed container")
 
-        guard let container = underlyingValue(value) as? DecoderKeyedContainerType else {
+        guard let container = self.decoder.keyedContainer(from: value) else {
             throw self.willThrowError(self.decoder.failedToUnbox(value, to: KeyedDecodingContainer<NestedKey>.self, "nested keyed container"))
         }
 
@@ -639,7 +637,7 @@ public extension DecoderUnkeyedContainer {
         
         let value = try self.next(UnkeyedDecodingContainer.self, "nested unkeyed container")
         
-        guard let container = underlyingValue(value) as? DecoderUnkeyedContainerType else {
+        guard let container = self.decoder.unkeyedContainer(from: value) else {
             throw self.willThrowError(self.decoder.failedToUnbox(value, to: UnkeyedDecodingContainer.self, "nested unkeyed container"))
         }
         
@@ -686,24 +684,30 @@ extension Float : ConvertibleNumber {}
 extension Double: ConvertibleNumber {}
 
 fileprivate protocol UnderlyingValue {
-    func underlyingValue() -> Any?
+    func underlyingValue() -> Any
 }
 
 extension Optional: UnderlyingValue {
-    func underlyingValue() -> Any? {
-        if let wrapped = self {
+    
+    /// returns value or .none as Any
+    func underlyingValue() -> Any {
+        
+        if case .some(let wrapped) = self {
+            
             if let wrapped = wrapped as? UnderlyingValue {
                 return wrapped.underlyingValue()
             } else {
                 return wrapped
             }
+            
         } else {
-            return nil
+            return self as Any
         }
     }
 }
 
-func underlyingValue(_ value: Any?) -> Any? {
+/// returns the wrapped value or .none as Any
+func underlyingValue(_ value: Any?) -> Any {
     return value.underlyingValue()
 }
 

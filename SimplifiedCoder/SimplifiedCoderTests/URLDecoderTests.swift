@@ -1,8 +1,8 @@
 //
-//  URLEncoderTests.swift
+//  URLDecoder.swift
 //  SimplifiedCoderTests
 //
-//  Created by Brendan Henderson on 9/13/17.
+//  Created by Brendan Henderson on 9/14/17.
 //  Copyright © 2017 OKAY. All rights reserved.
 //
 
@@ -11,23 +11,25 @@ import XCTest
 @testable
 import SimplifiedCoder
 
-class TestURLEncoder: XCTestCase {
+
+
+class TestURLDecoder: XCTestCase {
     
-    var encoder = URLEncoder()
+    var decoder = URLDecoder()
+    
+    func _type<T>(of: T) -> T.Type {
+        return T.self
+    }
 
     func testArray() {
 
         let value = ["key": [1]]
-        
+
         let expectedResult = "key[]=1"
 
         do {
-
-            let string = try String(data: self.encoder.encode(value), encoding: .utf8)
-
-            XCTAssert(string != nil)
             
-            XCTAssert(string ?? "" == expectedResult, "Incorrect string: \(string ?? "")")
+            _ = try decoder.decode(_type(of: value), from: expectedResult)
 
         } catch {
             XCTFail("Error was thrown: \(error)")
@@ -37,15 +39,17 @@ class TestURLEncoder: XCTestCase {
     func testNestedArray() {
 
         let value = [[[[1]]]]
+        
+        let expectedResult = "[][][][]=1"
 
         do {
 
-            _ = try self.encoder.encode(value)
+            _ = try decoder.decode(_type(of: value), from: expectedResult)
 
             XCTFail()
 
-        } catch URLEncoder.URLEncoderError.incorrectTopLevelObject(_) {
-            
+        } catch URLQuerySerializer.FromQueryError.invalidName(let name, reason: _) {
+            XCTAssert(name == "[][][][]")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -54,17 +58,13 @@ class TestURLEncoder: XCTestCase {
     func testDictionary() {
 
         let value = ["key": ["key2":1]]
-        
+
         let expectedResult = "key[key2]=1"
-        
+
         do {
             
-            let string = try String(data: self.encoder.encode(value), encoding: .utf8)
-            
-            XCTAssert(string != nil)
-            
-            XCTAssert(string! == expectedResult, "Incorrect result: \(string!)")
-            
+            _ = try decoder.decode(_type(of: value), from: expectedResult)
+
         } catch {
             XCTFail("Error was thrown: \(error)")
         }
@@ -73,17 +73,13 @@ class TestURLEncoder: XCTestCase {
     func testNestedDictionary() {
 
         let value = ["key": ["key1":["key2": ["key3": 3], "key4": ["key5": 4]]]]
-        
+
         let expectedResult = "key[key1][key2][key3]=3&key[key1][key4][key5]=4"
-        
+
         do {
-            
-            let string = try String(data: self.encoder.encode(value), encoding: .utf8)
-            
-            XCTAssert(string != nil)
-            
-            XCTAssert(string! == expectedResult, "Incorrect result: \(string!)")
-            
+
+            _ = try decoder.decode(_type(of: value), from: expectedResult)
+
         } catch {
             XCTFail("Error was thrown: \(error)")
         }
@@ -92,15 +88,17 @@ class TestURLEncoder: XCTestCase {
     func testMixedDictionaryAndArray() {
 
         let value = ["key1":["key2": ["key3": [["key4": ["key5": [[[["key6": [1]]]]]]]]]]]
+        
+        let expectedResult = "key1[key2][key3][][key4][key5][][][][key6][]=1"
 
         do {
-
-            let value2 = try String(data: self.encoder.encode(value), encoding: .utf8)
-
-            XCTFail("encoder did not throw: \(value2 ?? "<void>__")")
-
-        } catch URLQuerySerializer.ToQueryError.nestedContainerInArray {
             
+            _ = try decoder.decode(_type(of: value), from: expectedResult)
+
+            XCTFail()
+
+        } catch URLQuerySerializer.FromQueryError.invalidName(let name, reason: _) {
+            XCTAssert(name == "key1[key2][key3][][key4][key5][][][][key6][]")
         } catch {
             XCTFail("Worng error: \(error)")
         }
@@ -118,7 +116,7 @@ class TestURLEncoder: XCTestCase {
             class NestedNested: Codable {
                 var value = 1
             }
-            
+
             var value = 1
             var nested = NestedNested()
         }
@@ -131,17 +129,13 @@ class TestURLEncoder: XCTestCase {
     func testObject() {
 
         let value = Object1()
-        
+
         let expectedResult = "value=1&array[]=1&dictionary[key]=2&nestedDictionary[key][]=1"
-        
+
         do {
             
-            let string = try String(data: self.encoder.encode(value), encoding: .utf8)
-            
-            XCTAssert(string != nil)
-            
-            XCTAssert(string! == expectedResult, "Incorrect result: \(string!)")
-            
+            _ = try decoder.decode(_type(of: value), from: expectedResult)
+
         } catch {
             XCTFail("Error was thrown: \(error)")
         }
@@ -150,36 +144,16 @@ class TestURLEncoder: XCTestCase {
     func testNestedObject() {
 
         let value = WithNestedClass()
-        
+
         let expectedResult = "value=1&value2=test&nested[value]=1&nested[nested][value]=1"
-        
+
         do {
             
-            let string = try String(data: self.encoder.encode(value), encoding: .utf8)
-            
-            XCTAssert(string != nil)
-            
-            XCTAssert(string! == expectedResult, "Incorrect result: \(string!)")
-            
+            _ = try decoder.decode(_type(of: value), from: expectedResult)
+
         } catch {
             XCTFail("Error was thrown: \(error)")
         }
     }
-    
-    // skip path tests because URLEncoder does not add any special functions to path handling
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -134,9 +134,9 @@ public struct URLQuerySerializer {
                 throw ToQueryError.nestedContainerInArray
             }
             
-            for (nestedKey, value) in value {
+            for (key, value) in value {
                 
-                try self._queryItems(name: name + "[\(nestedKey)]", value: value, to: &query)
+                try self._queryItems(name: name + "[\(key)]", value: value, to: &query)
             }
             
         } else if let value = value as? NSArray {
