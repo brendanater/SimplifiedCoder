@@ -51,20 +51,20 @@ public struct URLDecoder: TopLevelDecoder {
     
     public func decode<T>(_: T.Type, from value: Data) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
+        return try self.decode(T.self, fromValue: self.serializer.objectUnordered(from: value))
     }
     
     public func decode<T>(_: T.Type, from value: String) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
+        return try self.decode(T.self, fromValue: self.serializer.objectUnordered(from: value))
     }
     
     public func decode<T>(_: T.Type, from value: [URLQueryItem]) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
+        return try self.decode(T.self, fromValue: self.serializer.objectUnordered(from: value))
     }
     
-    public func decode<T>(_: T.Type, from value: [String: Any]) throws -> T where T : Decodable {
+    public func decode<T>(_: T.Type, fromValue value: Any) throws -> T where T : Decodable {
         
         return try Base(
             value: value,
@@ -81,6 +81,7 @@ public struct URLDecoder: TopLevelDecoder {
     }
     
     fileprivate class Base: TypedDecoderBase {
+        
         
         // OrderedDictionary is not needed in decoding
         
@@ -104,14 +105,45 @@ public struct URLDecoder: TopLevelDecoder {
         func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
             return try self.createKeyedContainer(KeyedContainer<Key>.self)
         }
-    
-        func convert<T: ConvertibleNumber>(number value: Any) throws -> T {
-    
-            if let number = NumberFormatter.shared.number(from: value as? String ?? "˜∆åƒ˚"), let result = T(exactly: number) {
-                return result
+        
+        func unbox(_ value: Any) throws -> Float {
+            do {
+                return try self.convert(number: value)
+            } catch {
+                
+                if let value = value as? String,
+                    case .convertFromString(let posInfString, let negInfString, let nanString) = self.options.nonConformingFloatDecodingStrategy {
+                    
+                    switch value {
+                    case posInfString: return .infinity
+                    case negInfString: return -.infinity
+                    case nanString: return .nan
+                    default: throw error
+                    }
+                } else {
+                    throw error
+                }
             }
-    
-            throw self.failedToUnbox(value, to: T.self)
+        }
+        
+        func unbox(_ value: Any) throws -> Double {
+            do {
+                return try self.convert(number: value)
+            } catch {
+                
+                if let value = value as? String,
+                    case .convertFromString(let posInfString, let negInfString, let nanString) = self.options.nonConformingFloatDecodingStrategy {
+                    
+                    switch value {
+                    case posInfString: return .infinity
+                    case negInfString: return -.infinity
+                    case nanString: return .nan
+                    default: throw error
+                    }
+                } else {
+                    throw error
+                }
+            }
         }
         
         func unbox(_ value: Any) throws -> Bool {
@@ -244,6 +276,7 @@ public struct URLDecoder: TopLevelDecoder {
     }
     
     fileprivate struct UnkeyedContainer: DecoderUnkeyedContainer {
+        
         
         var decoder: DecoderBase
         var container: DecoderUnkeyedContainerType

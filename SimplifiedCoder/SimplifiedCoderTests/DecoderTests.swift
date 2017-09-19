@@ -11,7 +11,7 @@ import XCTest
 @testable
 import SimplifiedCoder
 
-class TestDecoder: XCTestCase {
+class TestDecoderCase: XCTestCase {
     
     func decoder(value: Any) -> Decoder & SingleValueDecodingContainer & DecoderBase {
         return TestDecoderBase.init(value: value, codingPath: [], options: (), userInfo: [:])
@@ -533,20 +533,17 @@ class TestDecoderBase: TypedDecoderBase {
 }
 
 struct TestDecoderKeyedContainer<K: CodingKey>: DecoderKeyedContainer {
-    var decoder: DecoderBase
     
+    var decoder: DecoderBase
     var container: DecoderKeyedContainerType
     
-    var nestedPath: [CodingKey]
-    
-    init(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey]) {
+    init(decoder: DecoderBase, container: DecoderKeyedContainerType) {
         self.decoder = decoder
         self.container = container
-        self.nestedPath = nestedPath
     }
     
-    static func initSelf<Key>(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key> where Key : CodingKey {
-        return KeyedDecodingContainer(TestDecoderKeyedContainer<Key>.init(decoder: decoder, container: container, nestedPath: nestedPath))
+    static func initSelf<Key>(decoder: DecoderBase, container: DecoderKeyedContainerType, keyedBy: Key.Type) -> KeyedDecodingContainer<Key> where Key : CodingKey {
+        return KeyedDecodingContainer(TestDecoderKeyedContainer<Key>.init(decoder: decoder, container: container))
     }
     
     var usesStringValue: Bool = true
@@ -555,16 +552,13 @@ struct TestDecoderKeyedContainer<K: CodingKey>: DecoderKeyedContainer {
 }
 
 struct TestDecoderUnkeyedContainer: DecoderUnkeyedContainer {
-    var decoder: DecoderBase
     
+    var decoder: DecoderBase
     var container: DecoderUnkeyedContainerType
     
-    var nestedPath: [CodingKey]
-    
-    init(decoder: DecoderBase, container: DecoderUnkeyedContainerType, nestedPath: [CodingKey]) {
+    init(decoder: DecoderBase, container: DecoderUnkeyedContainerType) {
         self.decoder = decoder
         self.container = container
-        self.nestedPath = nestedPath
     }
     
     var currentIndex: Int = 0

@@ -11,6 +11,8 @@ import XCTest
 @testable
 import SimplifiedCoder
 
+let r = XCTestSuite.init(name: "TestURLEncoder")
+
 class TestURLEncoder: XCTestCase {
     
     var encoder = URLEncoder()
@@ -24,7 +26,7 @@ class TestURLEncoder: XCTestCase {
         do {
 
             let string = try String(data: self.encoder.encode(value), encoding: .utf8)
-
+            
             XCTAssert(string != nil)
             
             XCTAssert(string ?? "" == expectedResult, "Incorrect string: \(string ?? "")")

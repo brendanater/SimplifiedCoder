@@ -9,11 +9,11 @@
 import XCTest
 @testable import SimplifiedCoder
 
-class TestEncoder: XCTestCase {
+class TestEncoderCase: XCTestCase {
     
-    var encoder: TestEncoderBase = .init(options: (), userInfo: [:])
+    var encoder = TestEncoder()
     
-    var jsonEncoder: JSONEncoder = .init()
+    var jsonEncoder = JSONEncoder()
     
     // MARK: ObjectTests
     
@@ -304,7 +304,7 @@ class TestEncoder: XCTestCase {
         }
         
         do {
-            _ = try value.encode(to: encoder)
+            _ = try encoder.box(value)
             
             XCTFail("no error was thrown")
             
@@ -350,7 +350,7 @@ class TestEncoder: XCTestCase {
         }
         
         do {
-            _ = try value.encode(to: encoder)
+            _ = try encoder.box(value)
             
             XCTFail("no error was thrown")
             
@@ -375,7 +375,7 @@ class TestEncoder: XCTestCase {
         let value = top
         
         do {
-            _ = try value.encode(to: encoder)
+            _ = try encoder.box(value)
             
             XCTFail("no error was thrown")
             
@@ -395,9 +395,8 @@ class TestEncoder: XCTestCase {
     func testTopInt() {
         
         do {
-            try (topInt as Optional<Int>)?.encode(to: encoder)
             
-            let value = encoder.storage.removeLast().value
+            let value = try encoder.box(topInt)
             
             XCTAssert(value is Int)
             XCTAssert(value as? Int == topInt)
@@ -410,9 +409,8 @@ class TestEncoder: XCTestCase {
     func testTopDouble() {
         
         do {
-            try topDouble.encode(to: encoder)
             
-            let value = encoder.storage.removeLast().value
+            let value = try encoder.box(topDouble)
             
             XCTAssert(value is Double)
             XCTAssert(value as? Double == topDouble)
@@ -429,7 +427,7 @@ class TestEncoder: XCTestCase {
         let defaultErrorContext: EncodingError.Context
         
         do {
-            _ = try jsonEncoder.encode(value)
+            _ = try encoder.box(value)
             XCTFail()
             defaultErrorContext = .init(codingPath: [CodingKey].init(repeating: "", count: 1000), debugDescription: "")
             
@@ -445,7 +443,7 @@ class TestEncoder: XCTestCase {
         }
         
         do {
-            _ = try value.encode(to: encoder)
+            _ = try encoder.box(value)
             
             XCTFail("no error was thrown")
             
@@ -464,99 +462,121 @@ class TestEncoder: XCTestCase {
             XCTFail("Wrong error was thrown: \(error)")
         }
     }
+    
+    func testSuper() {
+        
+    }
 }
 
 enum AnError: Error {
     case error
 }
 
-class TestEncoderBase: TypedEncoderBase {
+struct TestEncoder: TopLevelEncoder {
     
-    var unkeyedContainerType: EncoderUnkeyedContainer.Type = TestEncoderUnkeyedContainer.self
-    
-    var referenceType: EncoderReference.Type = TestEncoderReference.self
-    
-    typealias Options = ()
-    
-    var options: ()
-    var userInfo: [CodingUserInfoKey : Any]
-    
-    var storage: [(key: CodingKey?, value: Any)] = []
-    var key: CodingKey? = nil
-    
-    var codingPath: [CodingKey] {
-        return _codingPath
-    }
-    
-    required init(options: (), userInfo: [CodingUserInfoKey : Any]) {
-        self.options = options
-        self.userInfo = userInfo
-    }
-    
-    func box(_ value: Float) throws -> Any {
+    func encode(_ value: Encodable) throws -> Data {
         
-        if value == Float.infinity {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: self.codingPath, debugDescription: "any"))
+        let value = try Base.init(options: (), userInfo: [:]).box(value)
+        
+        if JSONSerialization.isValidJSONObject(value) {
+            return try JSONSerialization.data(withJSONObject: value, options: [])
         } else {
-            return value
+            throw AnError.error
         }
     }
     
-    func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-        return self.createKeyedContainer(TestEncoderKeyedContainer<Key>.self)
-    }
-}
-
-struct TestEncoderKeyedContainer<K: CodingKey>: EncoderKeyedContainer {
-    typealias Key = K
-    
-    var encoder: EncoderBase
-    var container: EncoderKeyedContainerType
-    var nestedPath: [CodingKey]
-    
-    init(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey]) {
-        self.encoder = encoder
-        self.container = container
-        self.nestedPath = nestedPath
+    fileprivate func box<T: Encodable>(_ value: T) throws -> Any {
+        return try Base.init(options: (), userInfo: [:]).box(value)
     }
     
-    static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-        return KeyedEncodingContainer(TestEncoderKeyedContainer<Key>(encoder: encoder, container: container, nestedPath: nestedPath))
+    class Base: TypedEncoderBase {
+        
+        var unkeyedContainerType: EncoderUnkeyedContainer.Type = UnkeyedContainer.self
+        
+        var referenceType: EncoderReference.Type = Reference.self
+        
+        typealias Options = ()
+        
+        var options: ()
+        var userInfo: [CodingUserInfoKey : Any]
+        
+        var storage: [(key: CodingKey?, value: Any)] = []
+        var key: CodingKey? = nil
+        
+        var codingPath: [CodingKey] {
+            return _codingPath
+        }
+        
+        required init(options: (), userInfo: [CodingUserInfoKey : Any]) {
+            self.options = options
+            self.userInfo = userInfo
+        }
+        
+        func box(_ value: Float) throws -> Any {
+            
+            if value == Float.infinity {
+                throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: self.codingPath, debugDescription: "any"))
+            } else {
+                return value
+            }
+        }
+        
+        func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+            return self.createKeyedContainer(KeyedContainer<Key>.self)
+        }
     }
     
-    var usesStringValue: Bool = true
-}
-
-struct TestEncoderUnkeyedContainer: EncoderUnkeyedContainer {
-    
-    var encoder: EncoderBase
-    var container: EncoderUnkeyedContainerType
-    var nestedPath: [CodingKey]
-    
-    init(encoder: EncoderBase, container: EncoderUnkeyedContainerType, nestedPath: [CodingKey]) {
-        self.encoder = encoder
-        self.container = container
-        self.nestedPath = nestedPath
+    struct KeyedContainer<K: CodingKey>: EncoderKeyedContainer {
+        typealias Key = K
+        
+        var encoder: EncoderBase
+        var container: EncoderKeyedContainerType
+        var nestedPath: [CodingKey]
+        
+        init(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey]) {
+            self.encoder = encoder
+            self.container = container
+            self.nestedPath = nestedPath
+        }
+        
+        static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+            return KeyedEncodingContainer(KeyedContainer<Key>(encoder: encoder, container: container, nestedPath: nestedPath))
+        }
+        
+        var usesStringValue: Bool = true
     }
     
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-        return self.createKeyedContainer(TestEncoderKeyedContainer<NestedKey>.self)
+    struct UnkeyedContainer: EncoderUnkeyedContainer {
+        
+        var encoder: EncoderBase
+        var container: EncoderUnkeyedContainerType
+        var nestedPath: [CodingKey]
+        
+        init(encoder: EncoderBase, container: EncoderUnkeyedContainerType, nestedPath: [CodingKey]) {
+            self.encoder = encoder
+            self.container = container
+            self.nestedPath = nestedPath
+        }
+        
+        mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+            return self.createKeyedContainer(KeyedContainer<NestedKey>.self)
+        }
     }
-}
-
-class TestEncoderReference: TestEncoderBase, EncoderReference {
     
-    var reference: EncoderReferenceValue = .unkeyed(NSMutableArray(), index: 1)
-    var previousPath: [CodingKey] = []
-    
-    lazy var usesStringValue: Bool = true
-    
-    override var codingPath: [CodingKey] {
-        return _codingPath
-    }
-    
-    deinit {
-        willDeinit()
+    class Reference: Base, EncoderReference {
+        
+        var reference: EncoderReferenceValue = .unkeyed(NSMutableArray(), index: 1)
+        var previousPath: [CodingKey] = []
+        
+        lazy var usesStringValue: Bool = true
+        
+        override var codingPath: [CodingKey] {
+            return _codingPath
+        }
+        
+        deinit {
+            willDeinit()
+        }
     }
 }
 
