@@ -15,58 +15,115 @@ import SimplifiedCoder
 
 class TestURLDecoder: XCTestCase {
     
-    var decoder = URLDecoder()
-    
-    func _type<T>(of: T) -> T.Type {
-        return T.self
-    }
+    var decoder = { () -> URLDecoder in
+        
+        var decoder = URLDecoder()
+        
+        decoder.serializer.arraySerialization = .arraysAreDictionaries
+        
+        return decoder
+    }()
 
     func testArray() {
+        
+        // top-level cannot be array
+        let value = ["key": [UInt64.max, UInt64.min]]
 
-        let value = ["key": [1]]
-
-        let expectedResult = "key[]=1"
+        let expectedResult = "key[]=\(UInt64.max)&key[]=\(UInt64.min)"
+        
+        let expectedResult2 = "key[1]=\(UInt64.min)&key[0]=\(UInt64.max)"
 
         do {
             
-            _ = try decoder.decode(_type(of: value), from: expectedResult)
+            let result = try decoder.decode(type(of: value), from: expectedResult)
+            
+            if result["key"]?.count == 2, result["key"]?[0] == UInt64.max && result["key"]?[1] == UInt64.min {
+                
+            } else {
+                XCTFail("incorrect: \(result)")
+            }
+            
+            if case .arraysAreDictionaries = self.decoder.serializer.arraySerialization {
+                
+                do {
+                    let result = try decoder.decode(type(of: value), from: expectedResult2)
+                    
+                    if result["key"]?.count == 2, result["key"]?[0] == UInt64.max && result["key"]?[1] == UInt64.min {
+                        
+                    } else {
+                        XCTFail("incorrect: \(result)")
+                    }
+                } catch {
+                    XCTFail("\(error)")
+                }
+                
+            }
 
         } catch {
-            XCTFail("Error was thrown: \(error)")
+            XCTFail("\(type(of: error)).\(error)")
         }
     }
 
     func testNestedArray() {
 
-        let value = [[[[1]]]]
+        let value = ["test": [[[[1]]]]]
         
-        let expectedResult = "[][][][]=1"
+        let expectedResult = "test[][][][]=1"
+        
+        let expectedResult2 = "test[0][0][0][0]=1"
 
         do {
 
-            _ = try decoder.decode(_type(of: value), from: expectedResult)
+            _ = try decoder.decode(type(of: value), from: expectedResult)
 
             XCTFail()
 
-        } catch URLQuerySerializer.FromQueryError.invalidName(let name, reason: _) {
-            XCTAssert(name == "[][][][]")
+        } catch URLQuerySerializer.FromQueryError.invalidName(let name, reason: let reason) {
+            XCTAssert(name == "test[][][][]")
+            
+            if case .nestedContainerInArray = reason {
+                
+            } else {
+                XCTFail("wrong reason: \(reason)")
+            }
+            
         } catch {
             XCTFail("Wrong error: \(error)")
+        }
+        
+        if case .arraysAreDictionaries = self.decoder.serializer.arraySerialization {
+            
+            do {
+                
+                let result = try decoder.decode(type(of: value), from: expectedResult2)
+                
+                if result["test"] != nil, result["test"]!.count > 0, result["test"]![0].count > 0, result["test"]![0][0].count > 0, result["test"]![0][0][0].count > 0 {
+                    
+                    XCTAssert(result["test"]![0][0][0][0] == 1)
+                } else {
+                    XCTFail("incorrect: \(result)")
+                }
+                
+            } catch {
+                XCTFail("Error thrown: \(error)")
+            }
         }
     }
 
     func testDictionary() {
 
-        let value = ["key": ["key2":1]]
+        let value = ["test": Int.max, "test2": Int.min]
 
-        let expectedResult = "key[key2]=1"
+        let expectedResult = "test=\(Int.max)&test2=\(Int.min)"
 
         do {
             
-            _ = try decoder.decode(_type(of: value), from: expectedResult)
+            let result = try decoder.decode(type(of: value), from: expectedResult)
+            
+            XCTAssert(result["test"] == Int.max && result["test2"] == Int.min, "incorrect: \(result)")
 
         } catch {
-            XCTFail("Error was thrown: \(error)")
+            XCTFail("error: \(error)")
         }
     }
 
@@ -78,7 +135,7 @@ class TestURLDecoder: XCTestCase {
 
         do {
 
-            _ = try decoder.decode(_type(of: value), from: expectedResult)
+            _ = try decoder.decode(type(of: value), from: expectedResult)
 
         } catch {
             XCTFail("Error was thrown: \(error)")
@@ -93,7 +150,7 @@ class TestURLDecoder: XCTestCase {
 
         do {
             
-            _ = try decoder.decode(_type(of: value), from: expectedResult)
+            _ = try decoder.decode(type(of: value), from: expectedResult)
 
             XCTFail()
 
@@ -134,7 +191,7 @@ class TestURLDecoder: XCTestCase {
 
         do {
             
-            _ = try decoder.decode(_type(of: value), from: expectedResult)
+            _ = try decoder.decode(type(of: value), from: expectedResult)
 
         } catch {
             XCTFail("Error was thrown: \(error)")
@@ -149,7 +206,7 @@ class TestURLDecoder: XCTestCase {
 
         do {
             
-            _ = try decoder.decode(_type(of: value), from: expectedResult)
+            _ = try decoder.decode(type(of: value), from: expectedResult)
 
         } catch {
             XCTFail("Error was thrown: \(error)")

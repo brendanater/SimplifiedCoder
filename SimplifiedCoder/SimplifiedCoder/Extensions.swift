@@ -27,11 +27,6 @@
 
 import Foundation
 
-enum UnsupportedKey: Error {
-    case unsupportedStringValue
-    case unsupportedIntValue
-}
-
 extension String: CodingKey {
     
     public var stringValue: String {

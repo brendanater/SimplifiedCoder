@@ -31,258 +31,224 @@ import Foundation
 public protocol TopLevelEncoder {
     
     func encode(_ value: Encodable) throws -> Data
+    func encode(value: Encodable) throws -> Any
 }
 
 // MARK: - EncoderBase
 
 public protocol TypedEncoderBase: EncoderBase {
+    
     associatedtype Options
+    
     var options: Options {get}
-    init(options: Options, userInfo: [CodingUserInfoKey: Any])
+    
+    init(codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any], reference: EncoderReference?)
 }
 
-extension TypedEncoderBase {
+public extension TypedEncoderBase {
     
     var untypedOptions: Any {
-        get {
-            return options
+        return self.options
+    }
+    
+    init(codingPath: [CodingKey], untypedOptions: Any, userInfo: [CodingUserInfoKey : Any], reference: EncoderReference?) {
+        if let options = untypedOptions as? Self.Options {
+            self.init(codingPath: codingPath, options: options, userInfo: userInfo, reference: reference)
+        } else {
+            fatalError("Failed to cast to \(Self.Options.self): \(untypedOptions)")
         }
     }
     
-    public init(untypedOptions: Any, userInfo: [CodingUserInfoKey : Any]) {
-        if let options = untypedOptions as? Options {
-            self.init(options: options, userInfo: userInfo)
-        } else {
-            fatalError("Failed to cast to \(Options.self): \(untypedOptions)")
-        }
+    public static func start(with value: Encodable, options: Options, userInfo: [CodingUserInfoKey: Any]) throws -> Any {
+        return try Self.init(codingPath: [], options: options, userInfo: userInfo, reference: nil).start(with: value)
     }
+}
+
+fileprivate var null = NSNull()
+
+public enum EncoderReference {
+    case keyed(EncoderKeyedContainerContainer, key: AnyHashable)
+    case unkeyed(EncoderUnkeyedContainerContainer, index: Int)
 }
 
 public protocol EncoderBase: class, Encoder, SingleValueEncodingContainer {
     
     // references
     
-    var unkeyedContainerType: EncoderUnkeyedContainer.Type {get}
-    
-    var referenceType: EncoderReference.Type {get}
+    static var keyedContainerContainerType: EncoderKeyedContainerContainer.Type {get}
+    static var unkeyedContainerContainerType: EncoderUnkeyedContainerContainer.Type {get}
+    static var unkeyedContainerType: EncoderUnkeyedContainer.Type {get}
     
     // required methods
     
-    /// Options set on the top-level encoder.
+    //deinit {
+    //    self.willDeinit()
+    //}
+    
+    var codingPath: [CodingKey] {get set}
     var untypedOptions: Any {get}
     var userInfo: [CodingUserInfoKey : Any] {get}
-    init(untypedOptions: Any, userInfo: [CodingUserInfoKey : Any])
+    var reference: EncoderReference? {get}
     
-    // storage and key were zipped together to better guarantee a single path to any resource
-    var storage: [(key: CodingKey?, value: Any)] {get set}
-    // a temporary storage for a new key
-    var key: CodingKey? {get set}
+    init(codingPath: [CodingKey], untypedOptions: Any, userInfo: [CodingUserInfoKey : Any], reference: EncoderReference?)
+    
+    var storage: [Any] {get set} // = []
+    var canEncodeNewValue: Bool {get set} // = true
     
     // methods
     
-    var keyedContainerContainerType: EncoderKeyedContainerType.Type {get}
-    var unkeyedContainerContainerType: EncoderUnkeyedContainerType.Type {get}
+    func start(with value: Encodable) throws -> Any
     
-    // remember to override codingPath in subclasses (EncoderReference) if custom implementing codingPath
-    // default return self._codingPath
-    /// The path to the current point in encoding.
-    var codingPath: [CodingKey] {get}
+    func boxNil(         at codingPath: [CodingKey]) throws -> CanBeNil
+    func box(_ value: Bool  , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Int   , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Int8  , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Int16 , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Int32 , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Int64 , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: UInt  , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: UInt8 , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: UInt16, at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: UInt32, at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: UInt64, at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Float , at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Double, at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: String, at codingPath: [CodingKey]) throws -> Any
+    func box(_ value: Encodable, at codingPath: [CodingKey]) throws -> Any
     
-    var canEncodeNewValue: Bool {get}
-    
-    func removeKey() -> CodingKey?
-    
-    func set(_ encoded: Any)
-    
-    func willThrowError(_ error: Error) -> Error
-    
-    func encode<T>(_ value: T, with box: (T)throws->Any) throws
-    
-    func encodeNil(            ) throws
-    func encode(_ value: Bool  ) throws
-    func encode(_ value: Int   ) throws
-    func encode(_ value: Int8  ) throws
-    func encode(_ value: Int16 ) throws
-    func encode(_ value: Int32 ) throws
-    func encode(_ value: Int64 ) throws
-    func encode(_ value: UInt  ) throws
-    func encode(_ value: UInt8 ) throws
-    func encode(_ value: UInt16) throws
-    func encode(_ value: UInt32) throws
-    func encode(_ value: UInt64) throws
-    func encode(_ value: String) throws
-    func encode(_ value: Float ) throws
-    func encode(_ value: Double) throws
-    
-    func encode<T : Encodable>(_ value: T) throws
-    
-    // MARK: encoder.box(_:)
-    
-    func box(_ value: Void  ) throws -> Any
-    func box(_ value: Bool  ) throws -> Any
-    func box(_ value: Int   ) throws -> Any
-    func box(_ value: Int8  ) throws -> Any
-    func box(_ value: Int16 ) throws -> Any
-    func box(_ value: Int32 ) throws -> Any
-    func box(_ value: Int64 ) throws -> Any
-    func box(_ value: UInt  ) throws -> Any
-    func box(_ value: UInt8 ) throws -> Any
-    func box(_ value: UInt16) throws -> Any
-    func box(_ value: UInt32) throws -> Any
-    func box(_ value: UInt64) throws -> Any
-    func box(_ value: Float ) throws -> Any
-    func box(_ value: Double) throws -> Any
-    func box(_ value: String) throws -> Any
-    
-    func box(_ value: Encodable) throws -> Any
-    
-    func reencode(_ value: Encodable) throws -> Any
-    
-    func createKeyedContainer<T: EncoderKeyedContainer, Key>(_: T.Type) -> KeyedEncodingContainer<Key>
-    
-    // public func keyedContainer<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
-    //     return self.createKeyedContainer({ EncoderKeyedContainer }<Key>.self)
-    // }
-    
-    func unkeyedContainer() -> UnkeyedEncodingContainer
-    
-    func singleValueContainer() -> SingleValueEncodingContainer
+    // TODO: add methods
 }
 
 public extension EncoderBase {
     
-    public var keyedContainerContainerType: EncoderKeyedContainerType.Type {
+    public static var keyedContainerContainerType: EncoderKeyedContainerContainer.Type {
         return NSMutableDictionary.self
     }
     
-    public var unkeyedContainerContainerType: EncoderUnkeyedContainerType.Type {
+    public static var unkeyedContainerContainerType: EncoderUnkeyedContainerContainer.Type {
         return NSMutableArray.self
     }
     
-    public var _codingPath: [CodingKey] {
-        return self.storage.flatMap { $0.key }
-    }
-    
-    public var canEncodeNewValue: Bool {
-        // if a key is not set from a container, this will always return false
-        return self.key != nil || self.storage.count == 0
-    }
-    
-    public func removeKey() -> CodingKey? {
-        defer { self.key = nil }
-        return self.key
+    public func start(with value: Encodable) throws -> Any {
+        return try self.box(value, at: [])
     }
     
     public func set(_ encoded: Any) {
         
         guard self.canEncodeNewValue else {
             
-            let v = self.storage.last!.value
-            let first = "\(v) of type: \(type(of: v))"
-            let second = "\(encoded) of type: \(type(of: encoded))"
-            
-            fatalError("Tried to set a second value when previously already encoded at path: \(self.codingPath).  encoded: \(first) tried to set: \(second)")
+            fatalError("Tried to encode a second container when previously already encoded at path: \(self.codingPath).  encoded: \(type(of: self.storage.last ?? null)) tried to set: \(type(of: encoded))")
         }
         
-        self.storage.append((self.removeKey(), encoded))
+        self.storage.append(encoded)
+        
+        self.canEncodeNewValue = false
     }
     
-    public func willThrowError(_ error: Error) -> Error {
-        // so that the error can be handled without upsetting encode
-        // default does nothing
-        return error
-    }
-    
-    public func encode<T>(_ value: T, with box: (T)throws->Any) throws {
-        do {
-            try self.set(box(value))
-        } catch {
-            throw self.willThrowError(error)
-        }
-    }
-    
-    public func encodeNil(            ) throws { try encode(()   , with: self.box(_:)) }
-    public func encode(_ value: Bool  ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: Int   ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: Int8  ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: Int16 ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: Int32 ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: Int64 ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: UInt  ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: UInt8 ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: UInt16) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: UInt32) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: UInt64) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: String) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: Float ) throws { try encode(value, with: self.box(_:)) }
-    public func encode(_ value: Double) throws { try encode(value, with: self.box(_:)) }
-    
-    public func encode<T : Encodable>(_ value: T) throws { try encode(value as Encodable, with: self.box(_:)) }
+    public func encodeNil(            ) throws { self.set(try self.boxNil(    at: self.codingPath)) }
+    public func encode(_ value: Bool  ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: Int   ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: Int8  ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: Int16 ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: Int32 ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: Int64 ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: UInt  ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: UInt8 ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: UInt16) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: UInt32) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: UInt64) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: String) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: Float ) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode(_ value: Double) throws { self.set(try self.box(value, at: self.codingPath)) }
+    public func encode<T: Encodable>(_ value: T) throws { self.set(try self.box(value, at: self.codingPath)) }
     
     // MARK: encoder.box(_:)
     
-    public func box(_ value: Void  ) throws -> Any{return NSNull()}
-    public func box(_ value: Bool  ) throws -> Any { return value }
-    public func box(_ value: Int   ) throws -> Any { return value }
-    public func box(_ value: Int8  ) throws -> Any { return value }
-    public func box(_ value: Int16 ) throws -> Any { return value }
-    public func box(_ value: Int32 ) throws -> Any { return value }
-    public func box(_ value: Int64 ) throws -> Any { return value }
-    public func box(_ value: UInt  ) throws -> Any { return value }
-    public func box(_ value: UInt8 ) throws -> Any { return value }
-    public func box(_ value: UInt16) throws -> Any { return value }
-    public func box(_ value: UInt32) throws -> Any { return value }
-    public func box(_ value: UInt64) throws -> Any { return value }
-    public func box(_ value: Float ) throws -> Any { return value }
-    public func box(_ value: Double) throws -> Any { return value }
-    public func box(_ value: String) throws -> Any { return value }
+    public func boxNil(         at codingPath: [CodingKey]) throws -> CanBeNil { return null  }
+    public func box(_ value: Bool  , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: Int   , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: Int8  , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: Int16 , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: Int32 , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: Int64 , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: UInt  , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: UInt8 , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: UInt16, at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: UInt32, at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: UInt64, at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: Float , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: Double, at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: String, at codingPath: [CodingKey]) throws -> Any { return value }
     
-    public func box(_ value: Encodable) throws -> Any {
+    /// a routing hub to the boxing methods (nothing is encoded directly in this method)
+    public func box(_ value: Encodable, at codingPath: [CodingKey]) throws -> Any {
         
-        return try reencode(value)
+        return try self.reencode(value, at: codingPath)
         
         //switch value {
-        //case is Date: return try box(value as Date)
-        //case is URL: return try box(value as URL)
-        //default: return try reencode(value)
+        //case is Date: return try box(value as! Date, at: codingPath)
+        //case is URL: return try box(value as! URL, at: codingPath)
+        //default: return try reencode(value, at: codingPath)
         //}
     }
     
-    public func reencode(_ value: Encodable) throws -> Any {
+    public func reencode(_ value: Encodable, at codingPath: [CodingKey]) throws -> Any {
         
-        let count = self.storage.count
+        return try self.reencode(type(of: value), at: codingPath, { try value.encode(to: self) })
+    }
+    
+    public func reencode(_ type: Any.Type, at codingPath: [CodingKey], _ encodingClosure: ()throws->()) throws -> Any {
         
-        try value.encode(to: self)
+        let previousPath = self.codingPath
+        self.codingPath = codingPath
+        
+        let depth = self.storage.count
+        
+        self.canEncodeNewValue = true
+        try encodingClosure()
+        
+        self.codingPath = previousPath
+        
+        let storageCount = self.storage.count
         
         // The top container should be a new container.
-        guard self.storage.count > count else {
-            fatalError("\(type(of: value)) did not encode a value.")
+        guard storageCount > depth else {
+            fatalError("\(type) did not encode a container.")
         }
         
-        return self.storage.removeLast().value
+        guard storageCount == depth + 1 else {
+            fatalError("\(type) encoded multiple containers (this is an encoder error, (use .canEncodeNewValue in set(Any)))")
+        }
+        
+        return self.storage.removeLast()
     }
     
     public func createKeyedContainer<T: EncoderKeyedContainer, Key>(_: T.Type) -> KeyedEncodingContainer<Key> {
         
         // If an existing keyed container was already requested, return that one.
-        let container: EncoderKeyedContainerType
+        let container: EncoderKeyedContainerContainer
         
         if self.canEncodeNewValue {
             
-            container = self.keyedContainerContainerType.init()
+            container = Self.keyedContainerContainerType.init()
             
             self.set(container)
             
         } else {
             
-            if let _container = self.storage.last?.value as? EncoderKeyedContainerType {
+            if let _container = (self.storage.last ?? null) as? EncoderKeyedContainerContainer {
                 container = _container
             } else {
                 preconditionFailure("Attempt to push new keyed encoding container when already previously encoded at this path.")
             }
         }
         
-        return T.initSelf(encoder: self, container: container, nestedPath: [], keyedBy: Key.self)
+        return T.initSelf(
+            encoder: self,
+            container: container,
+            nestedPath: [],
+            keyedBy: Key.self
+        )
     }
     
     // public func keyedContainer<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
@@ -291,42 +257,67 @@ public extension EncoderBase {
     
     public func unkeyedContainer() -> UnkeyedEncodingContainer {
         
-        let container: EncoderUnkeyedContainerType
+        let container: EncoderUnkeyedContainerContainer
         
         if self.canEncodeNewValue {
             
-            container = self.unkeyedContainerContainerType.init()
+            container = Self.unkeyedContainerContainerType.init()
             
             self.set(container)
             
         } else {
-            // could just crash here, but checks if the last encoded container is the same type and returns that.
-            // warning: if self.key is not set from an encoding container, no new container will be created
             
-            if let _container = self.storage.last?.value as? EncoderUnkeyedContainerType {
+            if let _container = (self.storage.last ?? null) as? EncoderUnkeyedContainerContainer {
                 container = _container
             } else {
-                preconditionFailure("Attempt to push new unkeyed encoding container when already previously encoded at this path.")
+                preconditionFailure("Attempt to push new unkeyed encoding container when already previously encoded at path: \(self.codingPath)")
             }
         }
         
-        return self.unkeyedContainerType.init(encoder: self, container: container, nestedPath: [])
+        return Self.unkeyedContainerType.init(
+            encoder: self,
+            container: container,
+            nestedPath: []
+        )
     }
     
     public func singleValueContainer() -> SingleValueEncodingContainer {
         return self
     }
+    
+    // Finalizes `self` by writing the contents of our storage to the reference's storage.
+    public func willDeinit() {
+        
+        guard let reference = self.reference, self.storage.count > 0 else {
+            return
+        }
+        
+        precondition(self.storage.count == 1, "Referencing encoder deallocated with multiple containers on stack.")
+
+        let encoded = self.storage.removeLast()
+
+        switch reference {
+
+        case .unkeyed(let container, index: let index):
+
+            container.replaceObject(at: index, with: encoded)
+
+        case .keyed(let container, key: let key):
+            
+            container.set(toStorage: encoded, forKey: key)
+        }
+    }
 }
 
 /// has to be a class to set to an already set object
-public protocol EncoderKeyedContainerType: class {
+public protocol EncoderKeyedContainerContainer: class {
     
     func set(toStorage value: Any, forKey key: AnyHashable)
     
     init()
 }
 
-extension NSMutableDictionary: EncoderKeyedContainerType {
+extension NSMutableDictionary: EncoderKeyedContainerContainer {
     
     public func set(toStorage value: Any, forKey key: AnyHashable) {
         self[key] = value
@@ -339,49 +330,19 @@ public protocol EncoderKeyedContainer: KeyedEncodingContainerProtocol {
     // required methods
     
     var encoder: EncoderBase {get}
-    var container: EncoderKeyedContainerType {get}
+    var container: EncoderKeyedContainerContainer {get}
     var nestedPath: [CodingKey] {get}
-    init(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey])
+    init(encoder: EncoderBase, container: EncoderKeyedContainerContainer, nestedPath: [CodingKey])
     
     /// initSelf is longer, but it's easier than the custom nestedKeyedContainer function
-    static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
+    static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerContainer, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key>
     
-    var usesStringValue: Bool {get}
+    /// whether to set to .container using the CodingKey's .stringValue or .intValue!
+    var usesStringValue: Bool {get} // = true/false
     
     // methods
     
-    var codingPath: [CodingKey] {get}
-    
-    func set(_ encoded: Any, forKey key: CodingKey)
-    
-    func willThrowError(_ error: Error, forKey key: Key) -> Error
-    
-    func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws
-    
-    // MARK: - KeyedEncodingContainerProtocol Methods
-    mutating func encodeNil(              forKey key: Key) throws
-    mutating func encode(_ value: Bool  , forKey key: Key) throws
-    mutating func encode(_ value: Int   , forKey key: Key) throws
-    mutating func encode(_ value: Int8  , forKey key: Key) throws
-    mutating func encode(_ value: Int16 , forKey key: Key) throws
-    mutating func encode(_ value: Int32 , forKey key: Key) throws
-    mutating func encode(_ value: Int64 , forKey key: Key) throws
-    mutating func encode(_ value: UInt  , forKey key: Key) throws
-    mutating func encode(_ value: UInt8 , forKey key: Key) throws
-    mutating func encode(_ value: UInt16, forKey key: Key) throws
-    mutating func encode(_ value: UInt32, forKey key: Key) throws
-    mutating func encode(_ value: UInt64, forKey key: Key) throws
-    mutating func encode(_ value: String, forKey key: Key) throws
-    mutating func encode(_ value: Float , forKey key: Key) throws
-    mutating func encode(_ value: Double, forKey key: Key) throws
-    
-    mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws
-    
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey>
-    mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer
-    
-    mutating func superEncoder() -> Encoder
-    mutating func superEncoder(forKey key: Key) -> Encoder
+    // TODO: add methods
 }
 
 public extension EncoderKeyedContainer {
@@ -390,95 +351,94 @@ public extension EncoderKeyedContainer {
         return self.encoder.codingPath + self.nestedPath
     }
     
-    public func set(_ encoded: Any, forKey key: CodingKey) {
+    func currentPath(_ key: CodingKey) -> [CodingKey] {
+        return self.codingPath + [key]
+    }
+    
+    public func _key(from key: CodingKey) -> AnyHashable {
         
         if self.usesStringValue {
             
-            self.container.set(toStorage: encoded, forKey: key.stringValue)
-
-        } else {
-
-            precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
+            return key.stringValue
             
-            self.container.set(toStorage: encoded, forKey: key.intValue!)
+        } else {
+            
+            precondition(key.intValue != nil, "Tried to get \(key) of type: \(type(of: key)) .intValue, but found nil.")
+            
+            return key.intValue!
         }
     }
     
-    public func willThrowError(_ error: Error, forKey key: Key) -> Error {
+    public func set(_ encoded: Any, forKey key: CodingKey) {
         
-        if let error = error as? HasCodingPath & Error {
-            
-            return error.withNestedPath(self.nestedPath + [key])
-        } else {
-            return error
-        }
-    }
-    
-    public func encode<T>(_ value: T, with box: (T)throws->Any, forKey key: Key) throws {
-        
-        do {
-            try self.set(box(value), forKey: key)
-            
-        } catch {
-            throw self.willThrowError(error, forKey: key)
-        }
+        self.container.set(toStorage: encoded, forKey: self._key(from: key))
     }
     
     // MARK: - KeyedEncodingContainerProtocol Methods
-    public mutating func encodeNil(              forKey key: Key) throws { try self.encode(()   , with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Bool  , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Int   , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Int8  , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Int16 , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Int32 , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Int64 , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: UInt  , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: UInt8 , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: UInt16, forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: UInt32, forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: UInt64, forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: String, forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Float , forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    public mutating func encode(_ value: Double, forKey key: Key) throws { try self.encode(value, with: self.encoder.box(_:), forKey: key) }
-    
-    // remember to set key to encoder.key before calling encoder.reencode(Encodable) after the initial container was added, or the encoder won't know that a value has been added with a codingPath.
-    public mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
-        
-        // how to have self.codingPath available
-        
-        self.encoder.key = key
-        
-        try encode(value as Encodable, with: self.encoder.box(_:), forKey: key)
-    }
+    public mutating func encodeNil(              forKey key: Key) throws { try self.set(self.encoder.boxNil(    at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Bool  , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Int   , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Int8  , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Int16 , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Int32 , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Int64 , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: UInt  , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: UInt8 , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: UInt16, forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: UInt32, forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: UInt64, forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: String, forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Float , forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode(_ value: Double, forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
+    public mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws { try self.set(self.encoder.box(value, at: self.currentPath(key)), forKey: key) }
     
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         
         let container = type(of: self.container).init()
         
         self.set(container, forKey: key)
-        
-        return Self.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key], keyedBy: NestedKey.self)
+            
+        return Self.initSelf(
+            encoder: self.encoder,
+            container: container,
+            nestedPath: self.nestedPath + [key],
+            keyedBy: NestedKey.self
+        )
     }
     
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
 
-        let container = self.encoder.unkeyedContainerContainerType.init()
+        let container = type(of: self.encoder).unkeyedContainerContainerType.init()
 
         self.set(container, forKey: key)
 
-        return self.encoder.unkeyedContainerType.init(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [key])
+        return type(of: self.encoder).unkeyedContainerType.init(
+            encoder: self.encoder,
+            container: container,
+            nestedPath: self.nestedPath + [key]
+        )
+    }
+    
+    private func _superEncoder(forKey key: CodingKey) -> Encoder {
+        
+        return type(of: self.encoder).init(
+            codingPath: self.codingPath + [key],
+            untypedOptions: self.encoder.untypedOptions,
+            userInfo: self.encoder.userInfo,
+            reference: .keyed(self.container, key: self._key(from: key))
+        )
     }
 
     public mutating func superEncoder() -> Encoder {
-        return self.encoder.referenceType.init(encoder: self.encoder, reference: .keyed(self.container, key: "super"), previousPath: self.codingPath + ["super"])
+        return self._superEncoder(forKey: "super")
     }
 
     public mutating func superEncoder(forKey key: Key) -> Encoder {
-        return self.encoder.referenceType.init(encoder: self.encoder, reference: .keyed(self.container, key: key), previousPath: self.codingPath + [key])
+        return self._superEncoder(forKey: key)
     }
 }
 
-public protocol EncoderUnkeyedContainerType: class {
+public protocol EncoderUnkeyedContainerContainer: class {
     
     init()
     var count: Int {get}
@@ -486,60 +446,21 @@ public protocol EncoderUnkeyedContainerType: class {
     func replaceObject(at index: Int, with object: Any)
 }
 
-extension NSMutableArray: EncoderUnkeyedContainerType {}
+extension NSMutableArray: EncoderUnkeyedContainerContainer {}
 
 public protocol EncoderUnkeyedContainer : UnkeyedEncodingContainer {
     
     // required methods
     
     var encoder: EncoderBase {get}
-    var container: EncoderUnkeyedContainerType {get}
+    var container: EncoderUnkeyedContainerContainer {get}
     var nestedPath: [CodingKey] {get}
-    init(encoder: EncoderBase, container: EncoderUnkeyedContainerType, nestedPath: [CodingKey])
+    
+    init(encoder: EncoderBase, container: EncoderUnkeyedContainerContainer, nestedPath: [CodingKey])
     
     // methods
     
-    /// The path of coding keys taken to get to this point in encoding.
-    var codingPath: [CodingKey] {get}
-    
-    /// The number of elements encoded into the container.
-    var count: Int {get}
-    
-    var currentKey: CodingKey {get}
-    
-    func willThrowError(_ error: Error) -> Error
-    
-    func encode<T>(_ value: T, with box: (T)throws->Any) throws
-    
-    // MARK: - UnkeyedEncodingContainer Methods
-    mutating func encodeNil()             throws
-    mutating func encode(_ value: Bool)   throws
-    mutating func encode(_ value: Int)    throws
-    mutating func encode(_ value: Int8)   throws
-    mutating func encode(_ value: Int16)  throws
-    mutating func encode(_ value: Int32)  throws
-    mutating func encode(_ value: Int64)  throws
-    mutating func encode(_ value: UInt)   throws
-    mutating func encode(_ value: UInt8)  throws
-    mutating func encode(_ value: UInt16) throws
-    mutating func encode(_ value: UInt32) throws
-    mutating func encode(_ value: UInt64) throws
-    mutating func encode(_ value: String) throws
-    mutating func encode(_ value: Float)  throws
-    mutating func encode(_ value: Double) throws
-    
-    mutating func encode<T : Encodable>(_ value: T) throws
-    
-    func createKeyedContainer<T: EncoderKeyedContainer, NestedKey>(_: T.Type) -> KeyedEncodingContainer<NestedKey>
-    
-    //public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
-    //
-    //    return self.createKeyedContainer({ EncoderKeyedContainer }<NestedKey>.self)
-    //}
-    
-    mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer
-    
-    mutating func superEncoder() -> Encoder
+    // TODO: Add methods before submitting
 }
 
 public extension EncoderUnkeyedContainer {
@@ -549,62 +470,58 @@ public extension EncoderUnkeyedContainer {
         return self.encoder.codingPath + self.nestedPath
     }
     
+    public var currentPath: [CodingKey] {
+        return self.codingPath + [self.currentKey]
+    }
+    
     /// The number of elements encoded into the container.
     public var count: Int {
         return self.container.count
     }
     
+    public var currentIndex: Int {
+        return self.count
+    }
+    
     public var currentKey: CodingKey {
-        return "index: \(self.count)"
+        return "Index \(self.currentIndex)"
     }
     
-    public func willThrowError(_ error: Error) -> Error {
+    public func set(_ encoded: Any) {
         
-        if let error = error as? HasCodingPath & Error {
-            
-            return error.withNestedPath(self.nestedPath + [self.currentKey])
-        } else {
-            return error
-        }
-    }
-    
-    public func encode<T>(_ value: T, with box: (T)throws->Any) throws {
-        
-        do {
-            try self.container.add(box(value))
-            
-        } catch {
-            // because the containers have a nestedPath, they need to set it to the errors with a codingPath
-            throw self.willThrowError(error)
-        }
+        self.container.add(encoded)
     }
     
     // MARK: - UnkeyedEncodingContainer Methods
-    public mutating func encodeNil()             throws { try self.encode(()   , with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Bool)   throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Int)    throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Int8)   throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Int16)  throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Int32)  throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Int64)  throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: UInt)   throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: UInt8)  throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: UInt16) throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: UInt32) throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: UInt64) throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: String) throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Float)  throws { try self.encode(value, with: self.encoder.box(_:)) }
-    public mutating func encode(_ value: Double) throws { try self.encode(value, with: self.encoder.box(_:)) }
-    
-    // remember to set key to encoder.key before calling encoder.reencode(Encodable) after the initial container was added, or the encoder won't know that a value has been added with a codingPath.
-    public mutating func encode<T : Encodable>(_ value: T) throws { self.encoder.key = self.currentKey ; try encode(value as Encodable, with: encoder.box(_:)) }
+    public mutating func encodeNil(            ) throws { self.set(try self.encoder.boxNil(    at: self.currentPath)) }
+    public mutating func encode(_ value: Bool  ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: Int   ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: Int8  ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: Int16 ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: Int32 ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: Int64 ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: UInt  ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: UInt8 ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: UInt16) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: UInt32) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: UInt64) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: String) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: Float ) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode(_ value: Double) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
+    public mutating func encode<T: Encodable>(_ value: T) throws { self.set(try self.encoder.box(value, at: self.currentPath)) }
     
     public func createKeyedContainer<T: EncoderKeyedContainer, NestedKey>(_: T.Type) -> KeyedEncodingContainer<NestedKey> {
         
-        let container = self.encoder.keyedContainerContainerType.init()
+        let container = type(of: self.encoder).keyedContainerContainerType.init()
+        
         self.container.add(container)
         
-        return T.initSelf(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [self.currentKey], keyedBy: NestedKey.self)
+        return T.initSelf(
+            encoder: self.encoder,
+            container: container,
+            nestedPath: self.nestedPath + [self.currentKey],
+            keyedBy: NestedKey.self
+        )
     }
     
     //public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
@@ -614,95 +531,27 @@ public extension EncoderUnkeyedContainer {
     
     public mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
         
-        let container = self.encoder.unkeyedContainerContainerType.init()
+        let container = type(of: self.container).init()
+        
         self.container.add(container)
         
-        return Self.init(encoder: self.encoder, container: container, nestedPath: self.nestedPath + [self.currentKey])
+        return Self.init(
+            encoder: self.encoder,
+            container: container,
+            nestedPath: self.nestedPath + [self.currentKey]
+        )
     }
 
     public mutating func superEncoder() -> Encoder {
 
         defer { self.container.add("placeholder") }
-
-        return self.encoder.referenceType.init(encoder: self.encoder, reference: .unkeyed(self.container, index: self.count), previousPath: self.codingPath + ["super (\(self.currentKey))"])
+        
+        return type(of: self.encoder).init(
+            codingPath: self.currentPath,
+            untypedOptions: self.encoder.untypedOptions,
+            userInfo: self.encoder.userInfo,
+            reference: .unkeyed(self.container, index: self.currentIndex)
+        )
     }
 }
 
-public enum EncoderReferenceValue {
-    case keyed(EncoderKeyedContainerType, key: CodingKey)
-    case unkeyed(EncoderUnkeyedContainerType, index: Int)
-}
-
-public protocol EncoderReference : EncoderBase {
-    
-    // required methods
-    
-    var reference: EncoderReferenceValue {get set}
-    var previousPath: [CodingKey] {get set}
-    
-    var usesStringValue: Bool {get}
-    
-    // previousPath will not be appended if codingPath is not overridden when subclassed
-    var codingPath: [CodingKey] {get}
-    
-    // var codingPath: [CodingKey] {
-    //     return _codingPath
-    // }
-    
-    // super will not be returned if willDeinit() is not called or implemented
-    //deinit {
-    //    willDeinit()
-    //}
-    
-    // new methods
-    
-    init(encoder: EncoderBase, reference: EncoderReferenceValue, previousPath: [CodingKey])
-    
-    /// Finalizes `self` by writing the contents of our storage to the reference's storage.
-    func willDeinit()
-    
-}
-
-extension EncoderReference {
-    
-    public init(encoder: EncoderBase, reference: EncoderReferenceValue, previousPath: [CodingKey]) {
-        
-        self.init(untypedOptions: encoder.untypedOptions, userInfo: encoder.userInfo)
-        
-        self.previousPath = previousPath
-        self.reference = reference
-    }
-    
-    public var _codingPath: [CodingKey] {
-        return self.previousPath + self.storage.flatMap { $0.key }
-    }
-    
-    // Finalizes `self` by writing the contents of our storage to the reference's storage.
-    public func willDeinit() {
-        
-        guard self.storage.count > 0 else { return }
-        precondition(self.storage.count < 2, "Referencing encoder deallocated with multiple containers on stack.")
-        
-        let encoded = self.storage.removeLast().value
-        
-        switch self.reference {
-            
-        case .unkeyed(let container, index: let index):
-            
-            container.replaceObject(at: index, with: encoded)
-            
-        case .keyed(let container, key: let key):
-            
-            if self.usesStringValue {
-                
-                container.set(toStorage: encoded, forKey: key.stringValue)
-                
-            } else {
-                
-                precondition(key.intValue != nil, "Tried to get \(key).intValue, but found nil.")
-                
-                container.set(toStorage: encoded, forKey: key.intValue!)
-            }
-        }
-    }
-}

@@ -51,24 +51,23 @@ public struct URLDecoder: TopLevelDecoder {
     
     public func decode<T>(_: T.Type, from value: Data) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
+        return try self.decode(T.self, fromValue: self.serializer.objectUnordered(from: value))
     }
     
     public func decode<T>(_: T.Type, from value: String) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
+        return try self.decode(T.self, fromValue: self.serializer.objectUnordered(from: value))
     }
     
     public func decode<T>(_: T.Type, from value: [URLQueryItem]) throws -> T where T : Decodable {
         
-        return try self.decode(T.self, from: self.serializer.objectUnordered(from: value))
+        return try self.decode(T.self, fromValue: self.serializer.objectUnordered(from: value))
     }
     
-    public func decode<T>(_: T.Type, from value: [String: Any]) throws -> T where T : Decodable {
+    public func decode<T>(_: T.Type, fromValue value: Any) throws -> T where T : Decodable {
         
-        return try Base(
-            value: value,
-            codingPath: [],
+        return try Base.start(
+            with: value,
             options: (
                 self.dateDecodingStrategy,
                 self.dataDecodingStrategy,
@@ -77,7 +76,6 @@ public struct URLDecoder: TopLevelDecoder {
             ),
             userInfo: self.userInfo
         )
-        .decode(T.self)
     }
     
     fileprivate class Base: TypedDecoderBase {
@@ -87,34 +85,65 @@ public struct URLDecoder: TopLevelDecoder {
         lazy var unkeyedContainerType: DecoderUnkeyedContainer.Type = UnkeyedContainer.self
         
         typealias Options = URLDecoder.Options
-        
-        var storage: [Any]
         var options: Options
         var userInfo: [CodingUserInfoKey : Any]
         
-        var codingPath: [CodingKey] = []
+        var codingPath: [CodingKey]
         
-        required init(value: Any, codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any]) {
+        var storage: [Any] = []
+        
+        required init(codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any]) {
             
-            self.storage = [value]
             self.options = options
             self.userInfo = userInfo
+            self.codingPath = codingPath
         }
         
         func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
             return try self.createKeyedContainer(KeyedContainer<Key>.self)
         }
-    
-        func convert<T: ConvertibleNumber>(number value: Any) throws -> T {
-    
-            if let number = NumberFormatter.shared.number(from: value as? String ?? "˜∆åƒ˚"), let result = T(exactly: number) {
-                return result
+        
+        func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Float {
+            do {
+                return try self.convert(number: value, at: codingPath)
+            } catch {
+                
+                if let value = value as? String,
+                    case .convertFromString(let posInfString, let negInfString, let nanString) = self.options.nonConformingFloatDecodingStrategy {
+                    
+                    switch value {
+                    case posInfString: return .infinity
+                    case negInfString: return -.infinity
+                    case nanString: return .nan
+                    default: throw error
+                    }
+                } else {
+                    throw error
+                }
             }
-    
-            throw self.failedToUnbox(value, to: T.self)
         }
         
-        func unbox(_ value: Any) throws -> Bool {
+        func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Double {
+            do {
+                return try self.convert(number: value, at: codingPath)
+            } catch {
+                
+                if let value = value as? String,
+                    case .convertFromString(let posInfString, let negInfString, let nanString) = self.options.nonConformingFloatDecodingStrategy {
+                    
+                    switch value {
+                    case posInfString: return .infinity
+                    case negInfString: return -.infinity
+                    case nanString: return .nan
+                    default: throw error
+                    }
+                } else {
+                    throw error
+                }
+            }
+        }
+        
+        func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Bool {
             let value = value as? String
             
             if value == self.options.boolRepresentation.true {
@@ -127,26 +156,25 @@ public struct URLDecoder: TopLevelDecoder {
         }
         
         /// unbox Date uses other unbox functions to get value
-        func unbox(_ value: Any) throws -> Date {
+        func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Date {
 
             switch self.options.dateDecodingStrategy {
 
             case .deferredToDate:
                 self.storage.append(value)
-                let date = try Date(from: self)
-                self.storage.removeLast()
-                return date
+                defer { self.storage.removeLast() }
+                return try Date(from: self)
 
             case .secondsSince1970:
-                return try Date(timeIntervalSince1970: self.unbox(value))
+                return try Date(timeIntervalSince1970: self.unbox(value, at: codingPath))
 
             case .millisecondsSince1970:
-                return try Date(timeIntervalSince1970: self.unbox(value) / 1000.0)
+                return try Date(timeIntervalSince1970: self.unbox(value, at: codingPath) / 1000.0)
 
             case .iso8601:
                 if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-                    guard let date = try ISO8601DateFormatter.shared.date(from: self.unbox(value) as String) else {
-                        throw self.corrupted("Expected date string to be ISO8601-formatted.")
+                    guard let date = try ISO8601DateFormatter.shared.date(from: self.unbox(value, at: codingPath) as String) else {
+                        throw self.corrupted("Expected date string to be ISO8601-formatted.", at: codingPath)
                     }
                     return date
                 } else {
@@ -154,83 +182,81 @@ public struct URLDecoder: TopLevelDecoder {
                 }
 
             case .formatted(let formatter):
-                guard let date = try formatter.date(from: self.unbox(value) as String) else {
-                    throw self.corrupted("Date string does not match format expected by formatter.")
+                guard let date = try formatter.date(from: self.unbox(value, at: codingPath) as String) else {
+                    throw self.corrupted("Date string does not match format expected by formatter.", at: codingPath)
                 }
                 return date
 
             case .custom(let closure):
                 self.storage.append(value)
-                let date = try closure(self)
-                self.storage.removeLast()
-                return date
+                defer { self.storage.removeLast() }
+                return try closure(self)
             }
         }
 
-        func unbox(_ value: Any) throws -> Data {
+        func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Data {
 
             switch self.options.dataDecodingStrategy {
             case .deferredToData:
                 self.storage.append(value)
-                let data = try Data(from: self)
-                self.storage.removeLast()
-                return data
+                defer { self.storage.removeLast() }
+                return try Data(from: self)
 
             case .base64:
-                guard let data = try Data(base64Encoded: self.unbox(value) as String) else {
-                    throw self.corrupted("Encountered Data is not valid Base64.")
+                guard let data = try Data(base64Encoded: self.unbox(value, at: codingPath) as String) else {
+                    throw self.corrupted("Encountered Data is not valid Base64.", at: codingPath)
                 }
 
                 return data
 
             case .custom(let closure):
                 self.storage.append(value)
-                let data = try closure(self)
-                self.storage.removeLast()
-                return data
+                defer { self.storage.removeLast() }
+                return try closure(self)
             }
         }
 
-        func unbox(_ value: Any) throws -> Decimal {
+        func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Decimal {
 
             // Attempt to bridge from NSDecimalNumber.
             if let decimal = value as? Decimal {
                 return decimal
             } else {
-                return try Decimal(self.unbox(value) as Double)
+                return try Decimal(self.unbox(value, at: codingPath) as Double)
             }
         }
 
-        func unbox(_ value: Any) throws -> URL {
+        func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> URL {
 
-            guard let url = try URL(string: self.unbox(value)) else {
-                throw self.corrupted("Invalid url string.")
+            guard let url = try URL(string: self.unbox(value, at: codingPath)) else {
+                throw self.corrupted("Invalid url string.", at: codingPath)
             }
 
             return url
         }
 
-        func unbox<T : Decodable>(_ value: Any) throws -> T {
+        func unbox<T>(_ value: Any, at codingPath: [CodingKey]) throws -> T where T : Decodable {
 
             switch T.self {
-            case is Date.Type:    return try self.unbox(value) as Date    as! T
-            case is Data.Type:    return try self.unbox(value) as Data    as! T
-            case is URL.Type:     return try self.unbox(value) as URL     as! T
-            case is Decimal.Type: return try self.unbox(value) as Decimal as! T
-            default: return try self.redecode(value)
+            case is Date.Type:    return try self.unbox(value, at: codingPath) as Date    as! T
+            case is Data.Type:    return try self.unbox(value, at: codingPath) as Data    as! T
+            case is URL.Type:     return try self.unbox(value, at: codingPath) as URL     as! T
+            case is Decimal.Type: return try self.unbox(value, at: codingPath) as Decimal as! T
+            default: return try self.redecode(value, at: codingPath)
             }
         }
     }
     
     fileprivate struct KeyedContainer<K: CodingKey>: DecoderKeyedContainer {
         
+        
         typealias Key = K
         
         var decoder: DecoderBase
-        var container: DecoderKeyedContainerType
+        var container: DecoderKeyedContainerContainer
         var nestedPath: [CodingKey]
         
-        init(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey]) {
+        init(decoder: DecoderBase, container: DecoderKeyedContainerContainer, nestedPath: [CodingKey]) {
             self.decoder = decoder
             self.container = container
             self.nestedPath = nestedPath
@@ -238,7 +264,7 @@ public struct URLDecoder: TopLevelDecoder {
         
         var usesStringValue: Bool = true
         
-        static func initSelf<Key>(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key> where Key : CodingKey {
+        static func initSelf<Key>(decoder: DecoderBase, container: DecoderKeyedContainerContainer, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key> where Key : CodingKey {
             return KeyedDecodingContainer(KeyedContainer<Key>.init(decoder: decoder, container: container, nestedPath: nestedPath))
         }
     }
@@ -246,10 +272,10 @@ public struct URLDecoder: TopLevelDecoder {
     fileprivate struct UnkeyedContainer: DecoderUnkeyedContainer {
         
         var decoder: DecoderBase
-        var container: DecoderUnkeyedContainerType
+        var container: DecoderUnkeyedContainerContainer
         var nestedPath: [CodingKey]
         
-        init(decoder: DecoderBase, container: DecoderUnkeyedContainerType, nestedPath: [CodingKey]) {
+        init(decoder: DecoderBase, container: DecoderUnkeyedContainerContainer, nestedPath: [CodingKey]) {
             self.decoder = decoder
             self.container = container
             self.nestedPath = nestedPath

@@ -52,9 +52,49 @@ import Foundation
 //    typealias Options = (
 //        dateDecodingStrategy: DateDecodingStrategy,
 //        dataDecodingStrategy: DataDecodingStrategy,
-//        nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy,
-//        numberLossyConversionStrategy: NumberLossyConversionStrategy
+//        nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
 //    )
+//
+//
+//func unbox(_ value: Any) throws -> Float {
+//    do {
+//        return try self.convert(number: value)
+//    } catch {
+//
+//        if let value = value as? String,
+//            case .convertFromString(let posInfString, let negInfString, let nanString) = self.options.nonConformingFloatDecodingStrategy {
+//
+//            switch value {
+//            case posInfString: return .infinity
+//            case negInfString: return -.infinity
+//            case nanString: return .nan
+//            default: throw error
+//            }
+//        } else {
+//            throw error
+//        }
+//    }
+//}
+//
+//func unbox(_ value: Any) throws -> Double {
+//    do {
+//        return try self.convert(number: value)
+//    } catch {
+//
+//        if let value = value as? String,
+//            case .convertFromString(let posInfString, let negInfString, let nanString) = self.options.nonConformingFloatDecodingStrategy {
+//
+//            switch value {
+//            case posInfString: return .infinity
+//            case negInfString: return -.infinity
+//            case nanString: return .nan
+//            default: throw error
+//            }
+//        } else {
+//            throw error
+//        }
+//    }
+//}
 //
 //    /// unbox Date uses other unbox functions to get value
 //    func unbox(_ value: Any) throws -> Date {

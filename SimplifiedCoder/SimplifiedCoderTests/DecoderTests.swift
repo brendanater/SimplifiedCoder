@@ -11,17 +11,57 @@ import XCTest
 @testable
 import SimplifiedCoder
 
-class TestDecoder: XCTestCase {
-    
-    func decoder(value: Any) -> Decoder & SingleValueDecodingContainer & DecoderBase {
-        return TestDecoderBase.init(value: value, codingPath: [], options: (), userInfo: [:])
-    }
+class TestDecoderCase: XCTestCase {
     
     var jsonDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.nonConformingFloatDecodingStrategy = .throw
         return decoder
     }()
+    
+    func getValue(_ value: Any) -> Any {
+        if var dictionary = value as? [String: Any] {
+            
+            for (key, value) in dictionary {
+                dictionary[key] = getValue(value)
+            }
+            
+            return dictionary
+        } else if let value = value as? NSArray {
+            
+            var result: [Any] = []
+            
+            for value in value {
+                result.append(getValue(value))
+            }
+            
+            return value
+        } else if let value = value as? String {
+            return value
+        } else if let value = value as? NSNumber {
+            return value
+        } else {
+            let mirror = Mirror(reflecting: value).children
+            
+            var result: [String: Any] = [:]
+            
+            for (label, value) in mirror {
+                guard let label = label else { continue}
+                
+                result[label] = getValue(value)
+            }
+            
+            return result
+        }
+    }
+    
+    func getError<T: Codable>(_ value: T) throws {
+        
+        let data = try self.data(from: value)
+        
+        _ = try jsonDecoder.decode(type(of: value), from: data)
+        
+    }
     
     func data<T: Encodable>(from value: T) throws -> Data {
         
@@ -35,10 +75,6 @@ class TestDecoder: XCTestCase {
     func value<T: Encodable>(from value: T) throws -> Any {
         
         return try JSONSerialization.jsonObject(with: data(from: value), options: [])
-    }
-    
-    func _type<T>(of: T) -> T.Type {
-        return T.self
     }
 
     // MARK: ObjectTests
@@ -95,6 +131,11 @@ class TestDecoder: XCTestCase {
             return type(of: value1) == type(of: value2)
         }
     }
+    
+    func decoderUnbox<T: Decodable>(_ value: Any, _ type: T.Type) throws -> T {
+        
+        return try TestDecoder().decode(T.self, fromValue: value)
+    }
 
     func testArray() {
         
@@ -102,9 +143,7 @@ class TestDecoder: XCTestCase {
 
         do {
             
-            let decoder = try self.decoder(value: self.value(from: value))
-
-            let value2 = try decoder.decode(_type(of: value))
+            let value2 = try self.decoderUnbox(getValue(value), type(of: value))
             
             XCTAssert(same(value, value2), "values not the same: \(value), \(value2)")
             
@@ -119,9 +158,7 @@ class TestDecoder: XCTestCase {
         
         do {
             
-            let decoder = try self.decoder(value: self.value(from: value))
-            
-            let value2 = try decoder.decode(_type(of: value))
+            let value2 = try self.decoderUnbox(getValue(value), type(of: value))
             
             XCTAssert(same(value, value2), "values not the same: \(value), \(value2)")
             
@@ -136,9 +173,7 @@ class TestDecoder: XCTestCase {
         
         do {
             
-            let decoder = try self.decoder(value: self.value(from: value))
-            
-            let value2 = try decoder.decode(_type(of: value))
+            let value2 = try self.decoderUnbox(getValue(value), type(of: value))
             
             XCTAssert(same(value, value2), "values not the same: \(value), \(value2)")
             
@@ -153,9 +188,7 @@ class TestDecoder: XCTestCase {
         
         do {
             
-            let decoder = try self.decoder(value: self.value(from: value))
-            
-            let value2 = try decoder.decode(_type(of: value))
+            let value2 = try self.decoderUnbox(getValue(value), type(of: value))
             
             XCTAssert(same(value, value2), "values not the same: \(value), \(value2)")
             
@@ -170,9 +203,7 @@ class TestDecoder: XCTestCase {
         
         do {
             
-            let decoder = try self.decoder(value: self.value(from: value))
-            
-            let value2 = try decoder.decode(_type(of: value))
+            let value2 = try self.decoderUnbox(getValue(value), type(of: value))
             
             XCTAssert(same(value, value2), "values not the same: \(value), \(value2)")
             
@@ -187,16 +218,14 @@ class TestDecoder: XCTestCase {
         var dictionary = ["": 2]
         var nestedDictionary = ["": [1]]
     }
-
+    
     func testObject() {
 
         let value = Object1()
         
         do {
             
-            let decoder = try self.decoder(value: self.value(from: value))
-            
-            let value2 = try decoder.decode(_type(of: value))
+            let value2 = try self.decoderUnbox(getValue(value), type(of: value))
             
             XCTAssert(same(value, value2), "values not the same: \(value), \(value2)")
             
@@ -214,16 +243,14 @@ class TestDecoder: XCTestCase {
         var value2 = "test"
         var nested = Nested()
     }
-
+    
     func testNestedObject() {
 
         let value = WithNestedClass()
         
         do {
             
-            let decoder = try self.decoder(value: self.value(from: value))
-            
-            let value2 = try decoder.decode(_type(of: value))
+            let value2 = try self.decoderUnbox(getValue(value), type(of: value))
             
             XCTAssert(same(value, value2), "values not the same: \(value), \(value2)")
             
@@ -239,28 +266,28 @@ class TestDecoder: XCTestCase {
         let value = [[[[Float.infinity]]]]
 
         let defaultErrorContext: DecodingError.Context
-
+        
         do {
-            let data = try self.data(from: value)
+            try getError(value)
             
-            _ = try jsonDecoder.decode(_type(of: value), from: data)
             XCTFail()
             return
-
+            
         } catch DecodingError.typeMismatch(let type, let context) {
-
+            
             XCTAssert(type == Float.self)
-
+            
             defaultErrorContext = context
-
+            
         } catch {
-            XCTFail()
+            XCTFail("\(error)")
             return
         }
+        
 
         do {
             
-            _ = try decoder(value: self.value(from: value)).decode(_type(of: value))
+            _ = try decoderUnbox(getValue(value), type(of: value))
 
             XCTFail("no error was thrown")
 
@@ -290,7 +317,7 @@ class TestDecoder: XCTestCase {
         do {
             let data = try self.data(from: value)
             
-            _ = try jsonDecoder.decode(_type(of: value), from: data)
+            _ = try jsonDecoder.decode([String: Float].self, from: data)
             XCTFail()
             return
             
@@ -307,7 +334,7 @@ class TestDecoder: XCTestCase {
         
         do {
             
-            _ = try decoder(value: self.value(from: value)).decode(_type(of: value))
+            _ = try decoderUnbox(getValue(value), type(of: value))
             
             XCTFail("no error was thrown")
             
@@ -327,10 +354,10 @@ class TestDecoder: XCTestCase {
 
     func testTop() {
 
-        let value = 1.1
+        let value = Float.infinity
 
         do {
-            let value = try decoder(value: value).decode(Int.self)
+            let value = try decoderUnbox(getValue(value), type(of: value))
 
             XCTFail("no error was thrown. value: \(value)")
 
@@ -338,48 +365,8 @@ class TestDecoder: XCTestCase {
 
             XCTAssert(context.codingPath.count == 0, "Unexpected path count: \(context.codingPath.count)")
 
-            XCTAssert(type == Int.self)
-
-        } catch {
-            XCTFail("Wrong error was thrown: \(error)")
-        }
-    }
-
-    func testTopInt() {
-        
-        let value = String?.some("pos")
-        
-        do {
-            _ = try decoder(value: value as Any).decode(Float?.self)
-            
-            XCTFail("no error was thrown")
-            
-        } catch DecodingError.typeMismatch(let type, let context) {
-            
-            XCTAssert(context.codingPath.count == 0, "Unexpected path count: \(context.codingPath.count)")
-            
             XCTAssert(type == Float.self)
-            
-        } catch {
-            XCTFail("Wrong error was thrown: \(error)")
-        }
-    }
 
-    func testTopDouble() {
-        
-        let value = 1.1
-        
-        do {
-            _ = try decoder(value: value).decode(Int.self)
-            
-            XCTFail("no error was thrown")
-            
-        } catch DecodingError.typeMismatch(let type, let context) {
-            
-            XCTAssert(context.codingPath.count == 0, "Unexpected path count: \(context.codingPath.count)")
-            
-            XCTAssert(type == Int.self)
-            
         } catch {
             XCTFail("Wrong error was thrown: \(error)")
         }
@@ -421,7 +408,7 @@ class TestDecoder: XCTestCase {
         do {
             let data = try self.data(from: value)
             
-            _ = try jsonDecoder.decode(_type(of: value), from: data)
+            _ = try jsonDecoder.decode(type(of: value), from: data)
             XCTFail()
             return
             
@@ -438,7 +425,7 @@ class TestDecoder: XCTestCase {
         
         do {
             
-            _ = try decoder(value: self.value(from: value)).decode(_type(of: value))
+            _ = try decoderUnbox(getValue(value), type(of: value))
             
             XCTFail("no error was thrown")
             
@@ -471,7 +458,7 @@ class TestDecoder: XCTestCase {
         do {
             let data = try self.data(from: value)
             
-            _ = try jsonDecoder.decode(_type(of: value), from: data)
+            _ = try jsonDecoder.decode(type(of: value), from: data)
             XCTFail()
             return
             
@@ -488,7 +475,7 @@ class TestDecoder: XCTestCase {
         
         do {
             
-            _ = try decoder(value: self.value(from: value)).decode(_type(of: value))
+            _ = try decoderUnbox(getValue(value), type(of: value))
             
             XCTFail("no error was thrown")
             
@@ -505,73 +492,148 @@ class TestDecoder: XCTestCase {
             XCTFail("Wrong error was thrown: \(error)")
         }
     }
-}
+    
+    struct TestNestedPath: Codable {
+        
+        func encode(to encoder: Encoder) throws {
+            
+            var container = encoder.container(keyedBy: String.self)
+            
+            var nestedContainer = container.nestedContainer(keyedBy: String.self, forKey: "value")
+            
+            var nestedNestedContainer = nestedContainer.nestedContainer(keyedBy: String.self, forKey: "test")
+            
+            try nestedNestedContainer.encode(Float.infinity, forKey: "testing")
+        }
+        
+        init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: String.self)
 
-class TestDecoderBase: TypedDecoderBase {
-    required init(value: Any, codingPath: [CodingKey], options: (), userInfo: [CodingUserInfoKey : Any]) {
-        self.storage = [value]
-        self.codingPath = codingPath
-        self.options = options
-        self.userInfo = userInfo
-    }
-    
-    var options: ()
-    
-    typealias Options = ()
-    
-    var unkeyedContainerType: DecoderUnkeyedContainer.Type = TestDecoderUnkeyedContainer.self
-    
-    var storage: [Any]
-    
-    var codingPath: [CodingKey]
-    
-    var userInfo: [CodingUserInfoKey : Any]
-    
-    func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
-        return try self.createKeyedContainer(TestDecoderKeyedContainer<Key>.self)
-    }
-}
+            let nestedContainer = try container.nestedContainer(keyedBy: String.self, forKey: "value")
 
-struct TestDecoderKeyedContainer<K: CodingKey>: DecoderKeyedContainer {
-    var decoder: DecoderBase
-    
-    var container: DecoderKeyedContainerType
-    
-    var nestedPath: [CodingKey]
-    
-    init(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey]) {
-        self.decoder = decoder
-        self.container = container
-        self.nestedPath = nestedPath
-    }
-    
-    static func initSelf<Key>(decoder: DecoderBase, container: DecoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedDecodingContainer<Key> where Key : CodingKey {
-        return KeyedDecodingContainer(TestDecoderKeyedContainer<Key>.init(decoder: decoder, container: container, nestedPath: nestedPath))
-    }
-    
-    var usesStringValue: Bool = true
-    
-    typealias Key = K
-}
+            let nestedNestedContainer = try nestedContainer.nestedContainer(keyedBy: String.self, forKey: "test")
 
-struct TestDecoderUnkeyedContainer: DecoderUnkeyedContainer {
-    var decoder: DecoderBase
-    
-    var container: DecoderUnkeyedContainerType
-    
-    var nestedPath: [CodingKey]
-    
-    init(decoder: DecoderBase, container: DecoderUnkeyedContainerType, nestedPath: [CodingKey]) {
-        self.decoder = decoder
-        self.container = container
-        self.nestedPath = nestedPath
+            _ = try nestedNestedContainer.decode(Float.self, forKey: "testing")
+        }
     }
     
-    var currentIndex: Int = 0
     
-    mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
-        return try self.createKeyedContainer(TestDecoderKeyedContainer<NestedKey>.self)
+    func testDefaultCorrectNestedContainer() {
+        
+        let value = ["value": ["test": ["testing": Float.infinity]]]
+        
+        let encoder = JSONEncoder()
+        
+        encoder.nonConformingFloatEncodingStrategy = .convertToString(positiveInfinity: "", negativeInfinity: "", nan: "")
+        
+        do {
+            
+            let data = try encoder.encode(value)
+            
+            do {
+                
+                let value = try jsonDecoder.decode(TestNestedPath.self, from: data)
+                
+                XCTFail("no error: \(value)")
+                
+            } catch DecodingError.typeMismatch(let type, let context) {
+            
+                XCTAssert(type == Float.self)
+                
+                XCTAssert(context.codingPath.count != 3 && context.codingPath.count == 1)
+                
+            } catch {
+                XCTFail("\(error)")
+            }
+            
+            
+        } catch {
+            XCTFail()
+        }
     }
     
+    class SuperClass: Codable {
+        
+        var variable1 = Float.infinity
+    }
+    
+    class SubClass: SuperClass {
+        
+        var variable2 = 2
+        
+        private enum CodingKeys: String, CodingKey {
+            
+            case variable2
+        }
+        
+        override func encode(to encoder: Encoder) throws {
+            
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            
+            try container.encode(variable2, forKey: .variable2)
+            
+            try super.encode(to: container.superEncoder())
+        }
+        
+        override init() {
+            super.init()
+        }
+        
+        required init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            variable2 = try container.decode(Int.self, forKey: .variable2)
+            
+            try super.init(from: try container.superDecoder())
+        }
+    }
+    
+    func testSuper() {
+        
+        let value = SubClass()
+        
+        let expected = ["variable2": 2, "super": ["variable1": Float.infinity]] as Any
+        
+        let defaultErrorContext: DecodingError.Context
+        
+        do {
+            let data = try self.data(from: value)
+            
+            _ = try jsonDecoder.decode(type(of: value), from: data)
+            XCTFail()
+            return
+            
+        } catch DecodingError.typeMismatch(let type, let context) {
+            
+            XCTAssert(type == Float.self)
+            
+            defaultErrorContext = context
+            
+        } catch {
+            XCTFail("\(error)")
+            return
+        }
+        
+        do {
+            
+            _ = try decoderUnbox(expected, type(of: value))
+            
+            XCTFail("no error was thrown")
+            
+        } catch DecodingError.typeMismatch(let type, let context) {
+            
+            XCTAssert(
+                defaultErrorContext.codingPath.count == context.codingPath.count,
+                "Differing codingPath count. Expected: \(defaultErrorContext.codingPath.count) actual: \(context.codingPath.count) (\(defaultErrorContext.codingPath), \(context.codingPath))"
+            )
+            
+            XCTAssert(type == Float.self)
+            
+        } catch {
+            XCTFail("Wrong error was thrown: \(error)")
+        }
+    }
 }
 
