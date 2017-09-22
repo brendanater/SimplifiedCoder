@@ -221,7 +221,7 @@ public struct URLQuerySerializer {
     
     public func query(from value: Any) throws -> String {
         
-        return try queryItems(from: value).map { "\($0.name)=\($0.value ?? "")"}.joined(separator: "&")
+        return try queryItems(from: value).map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
     }
     
     /// pass result to a URLComponents.queryItems to add to a URL
