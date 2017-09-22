@@ -296,8 +296,8 @@ public extension DecoderBase {
 
 public protocol DecoderKeyedContainerContainer {
     
-    func fromStorage(_ key: String) -> Any?
-    func fromStorage(_ key: Int) -> Any?
+    func value(forStringValue key: String) -> Any?
+    func value(forIntValue key: Int) -> Any?
     var keys: [AnyHashable] {get}
 }
 
@@ -307,11 +307,11 @@ extension NSDictionary: DecoderKeyedContainerContainer {
         return (self.allKeys as [Any]).flatMap { $0 as? AnyHashable }
     }
     
-    public func fromStorage(_ key: String) -> Any? {
+    public func value(forStringValue key: String) -> Any? {
         return self[key]
     }
     
-    public func fromStorage(_ key: Int) -> Any? {
+    public func value(forIntValue key: Int) -> Any? {
         return self[key]
     }
 }
@@ -380,7 +380,7 @@ public extension DecoderKeyedContainer {
         
         if self.usesStringValue {
             
-            guard let value = self.container.fromStorage(key.stringValue) else {
+            guard let value = self.container.value(forStringValue: key.stringValue) else {
                 throw self.keyNotFound(key)
             }
             
@@ -398,7 +398,7 @@ public extension DecoderKeyedContainer {
                 )
             }
             
-            guard let value = self.container.fromStorage(key.intValue!) else {
+            guard let value = self.container.value(forIntValue: key.intValue!) else {
                 throw self.keyNotFound(key)
             }
             
