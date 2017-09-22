@@ -30,6 +30,8 @@ import Foundation
 /// requires top level object to be a keyed container
 struct URLEncoder: TopLevelEncoder {
     
+    // MARK: options
+    
     var serializer = URLQuerySerializer()
     var dateEncodingStrategy: JSONEncoder.DateEncodingStrategy = .deferredToDate
     var dataEncodingStrategy: JSONEncoder.DataEncodingStrategy = .deferredToData
@@ -42,29 +44,31 @@ struct URLEncoder: TopLevelEncoder {
         nonConformingFloatEncodingStrategy: JSONEncoder.NonConformingFloatEncodingStrategy
     )
     
-    enum URLEncoderError: Swift.Error {
-        case incorrectTopLevelObject(Any)
-        case cannotEncodeToData(queryString: String)
-    }
+    // MARK: TopLevelEncoder
     
     func encode(_ value: Encodable) throws -> Data {
         
-        return try self.serializer.queryData(from: self.encode(asObject: value))
+        do {
+            return try self.serializer.queryData(from: self.encode(value: value))
+            
+        } catch {
+            
+            throw EncodingError.invalidValue(
+                value,
+                EncodingError.Context.init(
+                    codingPath: [],
+                    debugDescription: "Unable to encode the given top-level value to a query",
+                    underlyingError: error
+                )
+            )
+        }
     }
     
-    func encode(asQuery value: Encodable) throws -> String {
+    /// returns the value just before passing to serializer
+    func encode(value: Encodable) throws -> Any {
         
-        return try self.serializer.query(from: self.encode(asObject: value))
-    }
-    
-    func encode(asQueryItems value: Encodable) throws -> [URLQueryItem] {
-        
-        return try self.serializer.queryItems(from: self.encode(asObject: value))
-    }
-    
-    func encode(asObject value: Encodable) throws -> [(key: String, value: Any)] {
-        
-        let encoder = Base(
+        let value = try Base.start(
+            with: value,
             options: (
                 self.dateEncodingStrategy,
                 self.dataEncodingStrategy,
@@ -73,53 +77,92 @@ struct URLEncoder: TopLevelEncoder {
             userInfo: self.userInfo
         )
         
-        let value = try encoder.box(value)
-        
-        if let container = (value as? _OrderedDictionary)?.baseType() {
+        do {
+            try URLQuerySerializer.assertValidObject(value)
             
-            return container
+            return value
             
-        } else {
+        } catch {
             
-            throw URLEncoderError.incorrectTopLevelObject(value)
+            throw EncodingError.invalidValue(
+                value,
+                EncodingError.Context.init(
+                    codingPath: [],
+                    debugDescription: "Incorrect URLQuery object encoded",
+                    underlyingError: error
+                )
+            )
         }
     }
     
+    // MARK: other encode types
+    
+    func encode(asQuery value: Encodable) throws -> String {
+        
+        return try self.serializer.query(from: self.encode(value: value))
+    }
+    
+    func encode(asQueryItems value: Encodable) throws -> [URLQueryItem] {
+        
+        return try self.serializer.queryItems(from: self.encode(value: value))
+    }
+    
+    // MARK: Base
+    
     private class Base: TypedEncoderBase {
         
-        lazy var keyedContainerContainerType: EncoderKeyedContainerType.Type = _OrderedDictionary.self
-        
-        lazy var unkeyedContainerType: EncoderUnkeyedContainer.Type = UnkeyedContainer.self
-        lazy var referenceType: EncoderReference.Type = Reference.self
+        static var keyedContainerContainerType: EncoderKeyedContainerContainer.Type = _OrderedDictionary.self
+        static var unkeyedContainerType: EncoderUnkeyedContainer.Type = UnkeyedContainer.self
         
         typealias Options = URLEncoder.Options
+        
+        var codingPath: [CodingKey]
         var options: Options
-        
         var userInfo: [CodingUserInfoKey : Any]
+        var reference: EncoderReference?
         
-        required init(options: Options, userInfo: [CodingUserInfoKey : Any]) {
+        required init(codingPath: [CodingKey], options: Options, userInfo: [CodingUserInfoKey : Any], reference: EncoderReference?) {
+            self.codingPath = codingPath
             self.options = options
             self.userInfo = userInfo
+            self.reference = reference
         }
         
-        var storage: [(key: CodingKey?, value: Any)] = []
-        var key: CodingKey? = nil
+        var storage: [Any] = []
+        var canEncodeNewValue: Bool = true
         
-        var codingPath: [CodingKey] {
-            return _codingPath
+        func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+            return self.createKeyedContainer(URLEncoder.KeyedContainer<Key>.self)
         }
         
-        // boxing
-        
-        func box(_ value: Float) throws -> Any {
-            return try self.box(floatingPoint: value)
+        deinit {
+            self.willDeinit()
         }
         
-        func box(_ value: Double) throws -> Any {
-            return try self.box(floatingPoint: value)
+        // MARK: start
+        
+        func start(with value: Encodable) throws -> Any {
+            
+            let value = try self.box(value, at: [])
+            
+            if let value = value as? _OrderedDictionary {
+                return value.baseType()
+            } else {
+                return value
+            }
         }
         
-        func box<T: FloatingPoint>(floatingPoint value: T) throws -> Any {
+        // MARK: Boxing
+        
+        func box(_ value: Float, at codingPath: [CodingKey]) throws -> Any {
+            return try self.box(floatingPoint: value, at: codingPath)
+        }
+        
+        func box(_ value: Double, at codingPath: [CodingKey]) throws -> Any {
+            return try self.box(floatingPoint: value, at: codingPath)
+        }
+        
+        func box<T: FloatingPoint>(floatingPoint value: T, at codingPath: [CodingKey]) throws -> Any {
         
             if value.isInfinite || value.isNaN {
         
@@ -128,7 +171,7 @@ struct URLEncoder: TopLevelEncoder {
                     negativeInfinity: negitiveString,
                     nan: nan) = self.options.nonConformingFloatEncodingStrategy
                 else {
-                    throw _FloatingPointError.invalidFloatingPoint(value)
+                    throw EncodingError._invalidFloatingPointValue(value, at: codingPath)
                 }
         
                 switch value {
@@ -142,115 +185,99 @@ struct URLEncoder: TopLevelEncoder {
             }
         }
         
-        func box(_ date: Date) throws -> Any {
+        func box(_ value: Date, at codingPath: [CodingKey]) throws -> Any {
+            
             switch self.options.dateEncodingStrategy {
+                
             case .deferredToDate:
-                // Must be called with a surrounding with(pushedKey:) call.
-                try date.encode(to: self)
-                return self.storage.removeLast()
+                return try self.reencode(value, at: codingPath)
         
             case .secondsSince1970:
-                return NSNumber(value: date.timeIntervalSince1970)
+                return NSNumber(value: value.timeIntervalSince1970)
         
             case .millisecondsSince1970:
-                return NSNumber(value: 1000.0 * date.timeIntervalSince1970)
+                return NSNumber(value: 1000.0 * value.timeIntervalSince1970)
         
             case .iso8601:
                 if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-                    return NSString(string: ISO8601DateFormatter.shared.string(from: date))
+                    return ISO8601DateFormatter.shared.string(from: value)
                 } else {
                     fatalError("ISO8601DateFormatter is unavailable on this platform.")
                 }
         
             case .formatted(let formatter):
-                return NSString(string: formatter.string(from: date))
+                return formatter.string(from: value)
         
             case .custom(let closure):
-                let depth = self.storage.count
-                try closure(date, self)
-        
-                guard self.storage.count > depth else {
-                    //return default, throw, or fatal (I picked fatal because an encoder should encodeNil() even if it is nil)
-                    fatalError("Encoder did not encode any values")
-                }
-        
-                return self.storage.removeLast()
+                
+                return try self.reencode(type(of: value), at: codingPath, { try closure(value, self) })
             }
         }
         
-        func box(_ data: Data) throws -> Any {
+        func box(_ value: Data, at codingPath: [CodingKey]) throws -> Any {
+            
             switch self.options.dataEncodingStrategy {
+                
             case .deferredToData:
-                // data encodes a value (no need to check)
-                try data.encode(to: self)
-                return self.storage.removeLast()
+                return try self.reencode(value, at: codingPath)
         
             case .base64:
-                return NSString(string: data.base64EncodedString())
+                return value.base64EncodedString()
         
             case .custom(let closure):
-                let count = self.storage.count
-        
-                try closure(data, self)
-        
-                guard self.storage.count > count else {
-                    //return default, throw, or fatal (I picked fatal because an encoder should encodeNil() even if it is nil)
-                    fatalError("Encoder did not encode any values")
-                }
-        
-                // We can pop because the closure encoded something.
-                return self.storage.removeLast()
+                return try self.reencode(type(of: value), at: codingPath, { try closure(value, self) })
             }
         }
         
-        func box(_ value: URL) throws -> Any { return value.absoluteString }
+        func box(_ value: URL, at codingPath: [CodingKey]) throws -> Any {
+            
+            return value.absoluteString
+        }
         
-        func box(_ value: Encodable) throws -> Any {
+        func box(_ value: Encodable, at codingPath: [CodingKey]) throws -> Any {
         
             switch value {
-            case is Date   , is NSDate: return try box(value as! Date   )
-            case is Data   , is NSData: return try box(value as! Data   )
-            case is URL    , is NSURL : return try box(value as! URL    )
-            case is Decimal           : return try box(value as! Decimal)
-            default: return try reencode(value)
+            case is Date, is NSDate: return try box(value as! Date   , at: codingPath)
+            case is Data, is NSData: return try box(value as! Data   , at: codingPath)
+            case is URL , is NSURL : return try box(value as! URL    , at: codingPath)
+            case is Decimal        : return try box(value as! Decimal, at: codingPath)
+            default: return try reencode(value, at: codingPath)
             }
         }
-        
-        func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-            return self.createKeyedContainer(URLEncoder.KeyedContainer<Key>.self)
-        }
     }
+    
+    // MARK: KeyedContainer
     
     private struct KeyedContainer<K: CodingKey>: EncoderKeyedContainer {
         
         typealias Key = K
         
         var encoder: EncoderBase
-        var container: EncoderKeyedContainerType
+        var container: EncoderKeyedContainerContainer
         var nestedPath: [CodingKey]
         
-        init(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey]) {
+        init(encoder: EncoderBase, container: EncoderKeyedContainerContainer, nestedPath: [CodingKey]) {
             self.encoder = encoder
             self.container = container
             self.nestedPath = nestedPath
         }
         
-        static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-            return KeyedEncodingContainer(KeyedContainer<Key>.init(encoder: encoder, container: container, nestedPath: nestedPath))
+        static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerContainer, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+            return KeyedEncodingContainer(KeyedContainer<Key>(encoder: encoder, container: container, nestedPath: nestedPath))
         }
         
-        var usesStringValue: Bool {
-            return true
-        }
+        var usesStringValue: Bool = true
     }
+    
+    // MARK: UnkeyedContainer
     
     private struct UnkeyedContainer: EncoderUnkeyedContainer {
         
         var encoder: EncoderBase
-        var container: EncoderUnkeyedContainerType
+        var container: EncoderUnkeyedContainerContainer
         var nestedPath: [CodingKey]
         
-        init(encoder: EncoderBase, container: EncoderUnkeyedContainerType, nestedPath: [CodingKey]) {
+        init(encoder: EncoderBase, container: EncoderUnkeyedContainerContainer, nestedPath: [CodingKey]) {
             self.encoder = encoder
             self.container = container
             self.nestedPath = nestedPath
@@ -260,31 +287,33 @@ struct URLEncoder: TopLevelEncoder {
             return self.createKeyedContainer(KeyedContainer<NestedKey>.self)
         }
     }
-    
-    private class Reference: Base, EncoderReference {
-        
-        var reference: EncoderReferenceValue = .keyed(NSMutableDictionary(), key: "")
-        var previousPath: [CodingKey] = []
-        
-        lazy var usesStringValue: Bool = true
-        
-        override var codingPath: [CodingKey] {
-            return _codingPath
-        }
-        
-        deinit {
-            willDeinit()
-        }
-    }
 }
 
-fileprivate enum _FloatingPointError<T: FloatingPoint>: Error {
-    case invalidFloatingPoint(T)
+fileprivate extension EncodingError {
+    /// Returns a `.invalidValue` error describing the given invalid floating-point value.
+    ///
+    ///
+    /// - parameter value: The value that was invalid to encode.
+    /// - parameter path: The path of `CodingKey`s taken to encode this value.
+    /// - returns: An `EncodingError` with the appropriate path and debug description.
+    fileprivate static func _invalidFloatingPointValue<T : FloatingPoint>(_ value: T, at codingPath: [CodingKey]) -> EncodingError {
+        let valueDescription: String
+        if value == T.infinity {
+            valueDescription = "\(T.self).infinity"
+        } else if value == -T.infinity {
+            valueDescription = "-\(T.self).infinity"
+        } else {
+            valueDescription = "\(T.self).nan"
+        }
+        
+        let debugDescription = "Unable to encode \(valueDescription) directly in JSON. Use JSONEncoder.NonConformingFloatEncodingStrategy.convertToString to specify how the value should be encoded."
+        return .invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: debugDescription))
+    }
 }
 
 /// needed order for query and a tupleArray was too hard to use.
 /// before using value, call baseType()
-fileprivate final class _OrderedDictionary: EncoderKeyedContainerType {
+fileprivate final class _OrderedDictionary: EncoderKeyedContainerContainer {
     
     typealias Element = (key: String, value: Any)
     typealias Elements = [Element]

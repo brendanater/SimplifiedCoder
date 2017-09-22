@@ -11,8 +11,6 @@ import XCTest
 
 class TestEncoderCase: XCTestCase {
     
-    var encoder = TestEncoder()
-    
     var jsonEncoder = JSONEncoder()
     
     // MARK: ObjectTests
@@ -68,6 +66,10 @@ class TestEncoderCase: XCTestCase {
         }
     }
     
+    func start(with value: Encodable) throws -> Any {
+        return try TestEncoder().encode(value: value)
+    }
+    
     func testArray() {
         
         let value = [1]
@@ -83,9 +85,9 @@ class TestEncoderCase: XCTestCase {
         
         do {
             
-            let value2 = try encoder.box(value)
+            let value2 = try self.start(with: value)
             
-            XCTAssert(same(value1, value2))
+            XCTAssert(same(value1, value2), "values not the same: \(value1, value2)")
             
         } catch {
             XCTFail("Error was thrown: \(error)")
@@ -107,7 +109,7 @@ class TestEncoderCase: XCTestCase {
         
         do {
             
-            let value2 = try encoder.box(value)
+            let value2 = try self.start(with: value)
             
             XCTAssert(same(value1, value2))
             
@@ -132,7 +134,7 @@ class TestEncoderCase: XCTestCase {
         
         do {
             
-            let value2 = try encoder.box(value)
+            let value2 = try self.start(with: value)
             
             XCTAssert(same(value1, value2))
             
@@ -157,7 +159,7 @@ class TestEncoderCase: XCTestCase {
         
         do {
             
-            let value2 = try encoder.box(value)
+            let value2 = try self.start(with: value)
             
             XCTAssert(same(value1, value2))
             
@@ -182,7 +184,7 @@ class TestEncoderCase: XCTestCase {
         
         do {
             
-            let value2 = try encoder.box(value)
+            let value2 = try self.start(with: value)
             
             XCTAssert(same(value1, value2))
             
@@ -224,7 +226,7 @@ class TestEncoderCase: XCTestCase {
         
         do {
             
-            let value2 = try encoder.box(value)
+            let value2 = try self.start(with: value)
             
             XCTAssert(same(value1, value2))
             
@@ -249,7 +251,7 @@ class TestEncoderCase: XCTestCase {
         
         do {
             
-            let value2 = try encoder.box(value)
+            let value2 = try self.start(with: value)
             
             // NSTaggedPointerString != _NSContinguousString
             
@@ -304,13 +306,11 @@ class TestEncoderCase: XCTestCase {
         }
         
         do {
-            _ = try encoder.box(value)
+            let value = try self.start(with: value)
             
-            XCTFail("no error was thrown")
+            XCTFail("no error was thrown, value: \(value)")
             
         } catch EncodingError.invalidValue(let value, let context) {
-            
-            XCTAssert(context.underlyingError is AnError?)
             
             XCTAssert(
                 defaultErrorContext.codingPath.count == context.codingPath.count,
@@ -336,7 +336,7 @@ class TestEncoderCase: XCTestCase {
         do {
             _ = try jsonEncoder.encode(value)
             XCTFail()
-            defaultErrorContext = .init(codingPath: [CodingKey].init(repeating: "", count: 1000), debugDescription: "")
+            return
             
         } catch EncodingError.invalidValue(let value, let context) {
             
@@ -346,17 +346,15 @@ class TestEncoderCase: XCTestCase {
             
         } catch {
             XCTFail()
-            defaultErrorContext = .init(codingPath: [CodingKey].init(repeating: "", count: 1000), debugDescription: "")
+            return
         }
         
         do {
-            _ = try encoder.box(value)
+            _ = try self.start(with: value)
             
             XCTFail("no error was thrown")
             
         } catch EncodingError.invalidValue(let value, let context) {
-            
-            XCTAssert(context.underlyingError is AnError?)
             
             XCTAssert(
                 defaultErrorContext.codingPath.count == context.codingPath.count,
@@ -372,16 +370,14 @@ class TestEncoderCase: XCTestCase {
     
     func testTop() {
         
-        let value = top
+        let value = Float.infinity
         
         do {
-            _ = try encoder.box(value)
+            _ = try self.start(with: value)
             
             XCTFail("no error was thrown")
             
         } catch EncodingError.invalidValue(let value, let context) {
-            
-            XCTAssert(context.underlyingError is AnError?)
             
             XCTAssert(context.codingPath.count == 0, "Unexpected path count: \(context.codingPath.count)")
             
@@ -394,12 +390,14 @@ class TestEncoderCase: XCTestCase {
     
     func testTopInt() {
         
+        let value = 1
+        
         do {
             
-            let value = try encoder.box(topInt)
+            let result = try self.start(with: value)
             
-            XCTAssert(value is Int)
-            XCTAssert(value as? Int == topInt)
+            XCTAssert(result is Int)
+            XCTAssert(result as? Int == 1)
             
         } catch {
             XCTFail("Error was thrown: \(error)")
@@ -408,12 +406,14 @@ class TestEncoderCase: XCTestCase {
     
     func testTopDouble() {
         
+        let value = 1.1
+        
         do {
             
-            let value = try encoder.box(topDouble)
+            let result = try self.start(with: value)
             
-            XCTAssert(value is Double)
-            XCTAssert(value as? Double == topDouble)
+            XCTAssert(result is Double)
+            XCTAssert(result as? Double == topDouble)
             
         } catch {
             XCTFail("Error was thrown: \(error)")
@@ -427,9 +427,9 @@ class TestEncoderCase: XCTestCase {
         let defaultErrorContext: EncodingError.Context
         
         do {
-            _ = try encoder.box(value)
+            _ = try jsonEncoder.encode(value)
             XCTFail()
-            defaultErrorContext = .init(codingPath: [CodingKey].init(repeating: "", count: 1000), debugDescription: "")
+            return
             
         } catch EncodingError.invalidValue(let value, let context) {
             
@@ -439,17 +439,15 @@ class TestEncoderCase: XCTestCase {
             
         } catch {
             XCTFail()
-            defaultErrorContext = .init(codingPath: [CodingKey].init(repeating: "", count: 1000), debugDescription: "")
+            return
         }
         
         do {
-            _ = try encoder.box(value)
+            let value = try self.start(with: value)
             
-            XCTFail("no error was thrown")
+            XCTFail("no error was thrown: \(value)")
             
         } catch EncodingError.invalidValue(let value, let context) {
-            
-            XCTAssert(context.underlyingError is AnError?)
             
             XCTAssert(
                 defaultErrorContext.codingPath.count == context.codingPath.count,
@@ -459,123 +457,90 @@ class TestEncoderCase: XCTestCase {
             XCTAssert(value as? Float == Float.infinity)
             
         } catch {
-            XCTFail("Wrong error was thrown: \(error)")
+            XCTFail("\(type(of: error)).\(error)")
+        }
+    }
+    
+    class SuperClass: Codable {
+        
+        var variable1 = Float.infinity
+    }
+    
+    class SubClass: SuperClass {
+        
+        var variable2 = 2
+        
+        private enum CodingKeys: String, CodingKey {
+            
+            case variable2
+        }
+        
+        override func encode(to encoder: Encoder) throws {
+            
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            
+            try container.encode(variable2, forKey: .variable2)
+            
+            try super.encode(to: container.superEncoder())
+        }
+        
+        override init() {
+            super.init()
+        }
+        
+        required init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            variable2 = try container.decode(Int.self, forKey: .variable2)
+            
+            try super.init(from: try container.superDecoder())
         }
     }
     
     func testSuper() {
         
-    }
-}
+        let value = SubClass()
 
-enum AnError: Error {
-    case error
-}
+        let defaultErrorContext: EncodingError.Context
 
-struct TestEncoder: TopLevelEncoder {
-    
-    func encode(_ value: Encodable) throws -> Data {
-        
-        let value = try Base.init(options: (), userInfo: [:]).box(value)
-        
-        if JSONSerialization.isValidJSONObject(value) {
-            return try JSONSerialization.data(withJSONObject: value, options: [])
-        } else {
-            throw AnError.error
-        }
-    }
-    
-    fileprivate func box<T: Encodable>(_ value: T) throws -> Any {
-        return try Base.init(options: (), userInfo: [:]).box(value)
-    }
-    
-    class Base: TypedEncoderBase {
-        
-        var unkeyedContainerType: EncoderUnkeyedContainer.Type = UnkeyedContainer.self
-        
-        var referenceType: EncoderReference.Type = Reference.self
-        
-        typealias Options = ()
-        
-        var options: ()
-        var userInfo: [CodingUserInfoKey : Any]
-        
-        var storage: [(key: CodingKey?, value: Any)] = []
-        var key: CodingKey? = nil
-        
-        var codingPath: [CodingKey] {
-            return _codingPath
-        }
-        
-        required init(options: (), userInfo: [CodingUserInfoKey : Any]) {
-            self.options = options
-            self.userInfo = userInfo
-        }
-        
-        func box(_ value: Float) throws -> Any {
+        do {
             
-            if value == Float.infinity {
-                throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: self.codingPath, debugDescription: "any"))
-            } else {
-                return value
-            }
+            _ = try jsonEncoder.encode(value)
+            
+            XCTFail()
+            return
+
+        } catch EncodingError.invalidValue(let value, let context) {
+
+            XCTAssert(value as? Float == Float.infinity)
+
+            defaultErrorContext = context
+
+        } catch {
+            XCTFail("\(error)")
+            return
         }
-        
-        func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-            return self.createKeyedContainer(KeyedContainer<Key>.self)
-        }
-    }
-    
-    struct KeyedContainer<K: CodingKey>: EncoderKeyedContainer {
-        typealias Key = K
-        
-        var encoder: EncoderBase
-        var container: EncoderKeyedContainerType
-        var nestedPath: [CodingKey]
-        
-        init(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey]) {
-            self.encoder = encoder
-            self.container = container
-            self.nestedPath = nestedPath
-        }
-        
-        static func initSelf<Key>(encoder: EncoderBase, container: EncoderKeyedContainerType, nestedPath: [CodingKey], keyedBy: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-            return KeyedEncodingContainer(KeyedContainer<Key>(encoder: encoder, container: container, nestedPath: nestedPath))
-        }
-        
-        var usesStringValue: Bool = true
-    }
-    
-    struct UnkeyedContainer: EncoderUnkeyedContainer {
-        
-        var encoder: EncoderBase
-        var container: EncoderUnkeyedContainerType
-        var nestedPath: [CodingKey]
-        
-        init(encoder: EncoderBase, container: EncoderUnkeyedContainerType, nestedPath: [CodingKey]) {
-            self.encoder = encoder
-            self.container = container
-            self.nestedPath = nestedPath
-        }
-        
-        mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-            return self.createKeyedContainer(KeyedContainer<NestedKey>.self)
-        }
-    }
-    
-    class Reference: Base, EncoderReference {
-        
-        var reference: EncoderReferenceValue = .unkeyed(NSMutableArray(), index: 1)
-        var previousPath: [CodingKey] = []
-        
-        lazy var usesStringValue: Bool = true
-        
-        override var codingPath: [CodingKey] {
-            return _codingPath
-        }
-        
-        deinit {
-            willDeinit()
+
+        do {
+
+            let result = try self.start(with: value)
+
+            XCTFail("no error was thrown: \(result)")
+
+        } catch EncodingError.invalidValue(let value, let context) {
+
+            XCTAssert(
+                defaultErrorContext.codingPath.count == context.codingPath.count,
+                "Differing codingPath count. Expected: \(defaultErrorContext.codingPath.count) actual: \(context.codingPath.count) (\(defaultErrorContext.codingPath), \(context.codingPath))"
+            )
+            
+            // expected: ["super", "variable1"]
+
+            XCTAssert(value as? Float == Float.infinity)
+
+        } catch {
+            XCTFail("Wrong error was thrown: \(error)")
         }
     }
 }

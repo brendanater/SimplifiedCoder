@@ -31,7 +31,7 @@ class TestURLDecoder: XCTestCase {
 
         let expectedResult = "key[]=\(UInt64.max)&key[]=\(UInt64.min)"
         
-        let expectedResult2 = "key[1]=\(UInt64.max)&key[0]=\(UInt64.min)"
+        let expectedResult2 = "key[1]=\(UInt64.min)&key[0]=\(UInt64.max)"
 
         do {
             
@@ -45,12 +45,22 @@ class TestURLDecoder: XCTestCase {
             
             if case .arraysAreDictionaries = self.decoder.serializer.arraySerialization {
                 
-                _ = try decoder.decode(type(of: value), from: expectedResult2)
+                do {
+                    let result = try decoder.decode(type(of: value), from: expectedResult2)
+                    
+                    if result["key"]?.count == 2, result["key"]?[0] == UInt64.max && result["key"]?[1] == UInt64.min {
+                        
+                    } else {
+                        XCTFail("incorrect: \(result)")
+                    }
+                } catch {
+                    XCTFail("\(error)")
+                }
                 
             }
 
         } catch {
-            XCTFail("Error: \(error)")
+            XCTFail("\(type(of: error)).\(error)")
         }
     }
 

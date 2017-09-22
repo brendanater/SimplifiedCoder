@@ -97,7 +97,7 @@ public struct URLQuerySerializer {
     
     // MARK: isValidObject
     
-    public func isValidObject(_ value: Any, printError: Bool = false) -> Bool {
+    public static func isValidObject(_ value: Any, printError: Bool = false) -> Bool {
         
         do {
             try assertValidObject(value)
@@ -114,10 +114,7 @@ public struct URLQuerySerializer {
         }
     }
     
-    /// keys cannot contain these characters
-    private var _str = "[]#&="
-    
-    private func _assert(key: String, nested: Bool = false) throws {
+    private static func _assert(key: String, nested: Bool = false) throws {
         
         for c in key {
             if _str.contains(c) {
@@ -130,7 +127,7 @@ public struct URLQuerySerializer {
         }
     }
     
-    public func assertValidObject(_ value: Any) throws {
+    public static func assertValidObject(_ value: Any) throws {
         
         if let value = value as? [String: Any] {
             
@@ -168,7 +165,7 @@ public struct URLQuerySerializer {
         }
     }
     
-    private func _assertValidObject(_ value: Any) throws {
+    private static func _assertValidObject(_ value: Any) throws {
         
         if value as? NSNumber != nil {
             return
@@ -230,7 +227,7 @@ public struct URLQuerySerializer {
     /// pass result to a URLComponents.queryItems to add to a URL
     public func queryItems(from value: Any) throws -> [URLQueryItem] {
         
-        try assertValidObject(value)
+        try URLQuerySerializer.assertValidObject(value)
         
         var query: [URLQueryItem] = []
         
@@ -538,6 +535,9 @@ public struct URLQuerySerializer {
         }
     }
 }
+
+/// keys cannot contain these characters
+fileprivate var _str = "[]#&="
 
 fileprivate var _objcBoolType = type(of: true as NSNumber)
 

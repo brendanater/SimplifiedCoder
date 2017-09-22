@@ -32,7 +32,7 @@ class TestURLEncoder: XCTestCase {
             XCTAssert(string ?? "" == expectedResult, "Incorrect string: \(string ?? "")")
 
         } catch {
-            XCTFail("Error was thrown: \(error)")
+            XCTFail("\(type(of: error)).\(error)")
         }
     }
 
@@ -46,10 +46,14 @@ class TestURLEncoder: XCTestCase {
 
             XCTFail()
 
-        } catch URLEncoder.URLEncoderError.incorrectTopLevelObject(_) {
+        } catch EncodingError.invalidValue(let value, let context) {
+            
+            XCTAssert(value is NSArray)
+            
+            XCTAssert(context.codingPath.count == 0, context.debugDescription + ". CodingPath: \(context.codingPath)")
             
         } catch {
-            XCTFail("Wrong error: \(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -68,7 +72,7 @@ class TestURLEncoder: XCTestCase {
             XCTAssert(string! == expectedResult, "Incorrect result: \(string!)")
             
         } catch {
-            XCTFail("Error was thrown: \(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -101,7 +105,23 @@ class TestURLEncoder: XCTestCase {
 
             XCTFail("encoder did not throw: \(value2 ?? "<void>__")")
 
-        } catch URLQuerySerializer.ToQueryError.nestedContainerInArray {
+        } catch EncodingError.invalidValue(let value, let context) {
+            
+            XCTAssert(value is NSDictionary)
+            
+            XCTAssert(context.underlyingError is URLQuerySerializer.ToQueryError?)
+            
+            XCTAssert(context.codingPath.count == 0)
+            
+            if let error = context.underlyingError {
+                do {
+                    throw error
+                } catch URLQuerySerializer.ToQueryError.nestedContainerInArray {
+                    
+                } catch {
+                    XCTFail("\(error)")
+                }
+            }
             
         } catch {
             XCTFail("Worng error: \(error)")
@@ -140,9 +160,7 @@ class TestURLEncoder: XCTestCase {
             
             let string = try String(data: self.encoder.encode(value), encoding: .utf8)
             
-            XCTAssert(string != nil)
-            
-            XCTAssert(string! == expectedResult, "Incorrect result: \(string!)")
+            XCTAssert(string == expectedResult, "Incorrect result: \(string!)")
             
         } catch {
             XCTFail("Error was thrown: \(error)")
