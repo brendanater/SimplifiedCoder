@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		4968F0421F53109500DC43C0 /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4968F0411F53109500DC43C0 /* Decoder.swift */; };
-		8B1294981F732E7400F7662E /* CoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B1294971F732E7400F7662E /* CoderTests.swift */; };
 		8B6A36921F60B05300C25977 /* URLEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368E1F60B05300C25977 /* URLEncoder.swift */; };
 		8B6A36931F60B05300C25977 /* URLDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A368F1F60B05300C25977 /* URLDecoder.swift */; };
 		8B6A36941F60B05300C25977 /* URLQuerySerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6A36901F60B05300C25977 /* URLQuerySerializer.swift */; };
@@ -36,7 +35,6 @@
 
 /* Begin PBXFileReference section */
 		4968F0411F53109500DC43C0 /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
-		8B1294971F732E7400F7662E /* CoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoderTests.swift; sourceTree = "<group>"; };
 		8B6A368E1F60B05300C25977 /* URLEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLEncoder.swift; sourceTree = "<group>"; };
 		8B6A368F1F60B05300C25977 /* URLDecoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLDecoder.swift; sourceTree = "<group>"; };
 		8B6A36901F60B05300C25977 /* URLQuerySerializer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLQuerySerializer.swift; sourceTree = "<group>"; };
@@ -121,7 +119,6 @@
 			isa = PBXGroup;
 			children = (
 				8BA33A5D1F4E3DCB00BA7334 /* EncoderTests.swift */,
-				8B1294971F732E7400F7662E /* CoderTests.swift */,
 				8B9EB6411F69BD9E005F14F7 /* DecoderTests.swift */,
 				8B9EB6431F69E754005F14F7 /* URLEncoderTests.swift */,
 				8B998EC31F6B3AFD008C4941 /* URLDecoderTests.swift */,
@@ -255,7 +252,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				8B998EC41F6B3AFD008C4941 /* URLDecoderTests.swift in Sources */,
-				8B1294981F732E7400F7662E /* CoderTests.swift in Sources */,
 				8B9EB6421F69BD9E005F14F7 /* DecoderTests.swift in Sources */,
 				8BA33A5E1F4E3DCB00BA7334 /* EncoderTests.swift in Sources */,
 				8B9EB6441F69E754005F14F7 /* URLEncoderTests.swift in Sources */,
