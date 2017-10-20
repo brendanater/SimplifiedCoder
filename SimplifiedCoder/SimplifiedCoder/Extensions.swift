@@ -27,24 +27,132 @@
 
 import Foundation
 
-extension String: CodingKey {
+// CodingKey
+
+/// a codingKey where the intValue is never nil and the stringValue is always "Index " + self.intValue!.description
+public struct CodingIndexKey: CodingKey {
     
     public var stringValue: String {
-        return self
+        return "Index " + self.intValue!.description
     }
     
-    public init(stringValue: String) {
-        self = stringValue
+    public var intValue: Int?
+    
+    public init?(stringValue: String) {
+        
+        if let index = Int(stringValue) {
+            
+            self.intValue = index
+            
+        } else if stringValue.hasPrefix("Index ") {
+            
+            self.intValue = Int(stringValue[stringValue.index(stringValue.startIndex, offsetBy: 6)..<stringValue.endIndex].description)
+            
+        } else {
+            
+            return nil
+        }
     }
     
-    public var intValue: Int? {
-        return Int(self)
-    }
-    
-    public init?(intValue: Int) {
-        self = "\(intValue)"
+    public init(intValue: Int) {
+        self.intValue = intValue
     }
 }
+
+/// a coding key where the stringValue is always "super" and the intValue is always nil
+public struct CodingSuperKey: CodingKey {
+    
+    public var stringValue: String = "super"
+    
+    public init() {}
+    
+    public init?(stringValue: String) {
+        if stringValue != "super" {
+            return nil
+        }
+    }
+    
+    public var intValue: Int? = nil
+    
+    public init?(intValue: Int) {
+        return nil
+    }
+}
+
+func ==(lhs: CodingKey, rhs: CodingKey) -> Bool {
+    return lhs.stringValue == rhs.stringValue && lhs.intValue == rhs.intValue
+}
+
+public func equalPaths(_ path1: [CodingKey], _ path2: [CodingKey]) -> Bool {
+    
+    guard path1.count == path2.count else {
+        return false
+    }
+    
+    for (key1, key2) in zip(path1, path2) {
+        
+        guard key1 == key2 else {
+            
+            return false
+        }
+    }
+    
+    return true
+}
+
+// errors
+
+public extension DecodingError {
+    public var context: Context {
+        switch self {
+        case let .dataCorrupted(context): return context
+        case let .keyNotFound(_, context): return context
+        case let .typeMismatch(_, context): return context
+        case let .valueNotFound(_, context): return context
+        }
+    }
+}
+
+public extension EncodingError {
+    public var context: Context {
+        switch self {
+        case let .invalidValue(_, context): return context
+        }
+    }
+    
+    public var value: Any {
+        switch self {
+        case let .invalidValue(value, _): return value
+        }
+    }
+    
+    public var values: (value: Any, context: Context) {
+        switch self {
+        case let .invalidValue(value, context): return (value, context)
+        }
+    }
+}
+
+// user info
+
+extension CodingUserInfoKey: ExpressibleByStringLiteral {
+    public init(stringLiteral value: String) {
+        
+        if let _self = CodingUserInfoKey._init_(rawValue: value) {
+            
+            self = _self
+            
+        } else {
+            fatalError("Failed to init \(CodingUserInfoKey.self) with stringLiteral: \(value)")
+        }
+    }
+    
+    private static func _init_(rawValue: String) -> CodingUserInfoKey? {
+        return self.init(rawValue: rawValue)
+    }
+}
+
+// can be nil
 
 public protocol CanBeNil {
     var isNil: Bool {get}
@@ -69,16 +177,100 @@ public func isNil(_ value: Any?) -> Bool {
     return value.isNil
 }
 
+// optional
 
-
-extension NumberFormatter {
-    static var shared = NumberFormatter()
+fileprivate protocol _OptionalWrapping {
+    var _wrapped: Any? {get}
 }
 
-extension ISO8601DateFormatter {
-    static let shared: ISO8601DateFormatter = {
+extension Optional: _OptionalWrapping {
+    var _wrapped: Any? {
+        return self
+    }
+}
+
+/// returns the value as? an Optional without nesting the value
+public func asOptional<T>(_: T.Type, _ value: Any) -> T?? {
+    
+    if value is _OptionalWrapping {
+        return (value as! _OptionalWrapping)._wrapped as? T?
+    } else {
+        return nil
+    }
+}
+
+// shared
+
+public extension NumberFormatter {
+    public static var shared = NumberFormatter()
+}
+
+public extension ISO8601DateFormatter {
+    public static let shared: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = .withInternetDateTime
         return formatter
     }()
 }
+
+// NSNumber
+
+public extension NSNumber {
+    var isBoolean: Bool {
+        return self === kCFBooleanTrue || self === kCFBooleanFalse
+    }
+}
+
+// ObjectIdentifier
+
+public typealias TypeID = ObjectIdentifier
+
+// array
+
+public extension Array {
+    
+    /**
+     gets an ArraySlice or returns nil using subscript range:
+     index * count ..< min((index * count) + count, self.endIndex)
+     
+     example:
+     
+     let array = [0,1,2,3,4,5,6,7]
+     
+     [0,1,2]
+     let firstSlice = arraySlice(at: 0, count: 3)
+     
+     [3,4,5]
+     let secondSlice = arraySlice(at: 1, count: 3)
+     
+     [6,7]
+     let thirdSlice = arraySlice(at: 2, count: 3)
+     
+     nil
+     let fourthSlice = arraySlice(at: 3, count: 3)
+     
+     */
+    public func slice(at index: Int, count: Int) -> ArraySlice<Element>? {
+        
+        let index = index * count
+        
+        if index < self.endIndex {
+            return self[index..<Swift.min(index + count, self.endIndex)]
+        } else {
+            return nil
+        }
+    }
+}
+
+// dictionary
+
+public extension Dictionary {
+    init(_ elements: [Element]) {
+        self.init()
+        for (key, value) in elements {
+            self[key] = value
+        }
+    }
+}
+
+

@@ -8,9 +8,7 @@
 
 import Foundation
 import XCTest
-@testable
 import SimplifiedCoder
-
 
 
 class TestURLDecoder: XCTestCase {
@@ -48,7 +46,7 @@ class TestURLDecoder: XCTestCase {
                 do {
                     let result = try decoder.decode(type(of: value), from: expectedResult2)
                     
-                    if result["key"]?.count == 2, result["key"]?[0] == UInt64.max && result["key"]?[1] == UInt64.min {
+                    if result["key"]?.count == 2, result["key"]?[0] == UInt64.min && result["key"]?[1] == UInt64.max {
                         
                     } else {
                         XCTFail("incorrect: \(result)")
@@ -78,17 +76,17 @@ class TestURLDecoder: XCTestCase {
 
             XCTFail()
 
-        } catch URLQuerySerializer.FromQueryError.invalidName(let name, reason: let reason) {
-            XCTAssert(name == "test[][][][]")
+        } catch DecodingError.dataCorrupted(let context) {
             
-            if case .nestedContainerInArray = reason {
+            if let error = (context.underlyingError as? URLQuerySerializer.FromQueryError), case .invalidName(let name, reason: let reason) = error {
+                
+                XCTAssert(name == "test[][][][]", "\(name), \(reason)")
                 
             } else {
-                XCTFail("wrong reason: \(reason)")
+                XCTFail("\(context)")
             }
-            
         } catch {
-            XCTFail("Wrong error: \(error)")
+            XCTFail("Worng error: \(error)")
         }
         
         if case .arraysAreDictionaries = self.decoder.serializer.arraySerialization {
@@ -154,8 +152,15 @@ class TestURLDecoder: XCTestCase {
 
             XCTFail()
 
-        } catch URLQuerySerializer.FromQueryError.invalidName(let name, reason: _) {
-            XCTAssert(name == "key1[key2][key3][][key4][key5][][][][key6][]")
+        } catch DecodingError.dataCorrupted(let context) {
+            
+            if let error = (context.underlyingError as? URLQuerySerializer.FromQueryError), case .invalidName(let name, reason: let reason) = error {
+                
+                XCTAssert(name == "key1[key2][key3][][key4][key5][][][][key6][]", "\(name), \(reason)")
+                
+            } else {
+                XCTFail("\(context)")
+            }
         } catch {
             XCTFail("Worng error: \(error)")
         }
