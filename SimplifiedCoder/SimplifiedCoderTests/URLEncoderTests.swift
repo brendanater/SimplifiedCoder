@@ -2,9 +2,27 @@
 //  URLEncoderTests.swift
 //  SimplifiedCoderTests
 //
-//  Created by Brendan Henderson on 9/13/17.
-//  Copyright © 2017 OKAY. All rights reserved.
+//  MIT License
 //
+//  Copyright (c) 8/27/17 Brendan Henderson
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
 
 import Foundation
 import XCTest
@@ -40,10 +58,16 @@ class TestURLEncoder: XCTestCase {
         self.roundTrip(CoderTesting.uint64Values, isEqual: { $0 == $1 })
         
         self.roundTrip(CoderTesting.floatValues.filter { $0 == $0 && Float(($0 as NSNumber).description) == $0 }, isEqual: { $0 == $1 })
-        self.roundTrip(CoderTesting.doubleValues.filter { $0 == $0 && Double(($0 as NSNumber).description) == $0 }, isEqual: { $0 == $1 })
-        
         self.roundTrip(Float.nan, isEqual: { $0.isNaN && $1.isNaN })
+        
+        let doubleValues = CoderTesting.doubleValues.filter { $0 == $0 && Double(($0 as NSNumber).description) == $0 }
+        self.roundTrip(doubleValues, isEqual: { $0 == $1 })
         self.roundTrip(Double.nan, isEqual: { $0.isNaN && $1.isNaN })
+        
+        // Decimal freezes on init(inf)
+        self.roundTrip(doubleValues.filter { !$0.isInfinite }.map { Decimal($0) }, isEqual: { (value1: [Decimal], value2: [Decimal])->Bool in value1 == value2 })
+        self.roundTrip(Decimal(Double.nan), isEqual: { $0.isNaN && $1.isNaN })
+        
         
         for (string, description) in CoderTesting.stringValues(from: [.urlQueryAllowed], removeCharacters: "#&") {
             
@@ -63,7 +87,7 @@ class TestURLEncoder: XCTestCase {
         self.roundTrip([1: true, 2: false], isEqual: { $0 == $1 })
         
         self.roundTrip(Date(), isEqual: { $0 == $1 })
-        self.roundTrip(Data(bytes: [13,12,11,2,3]), isEqual: { $0 == $1 })
+        self.roundTrip(Data(bytes: CoderTesting.uint8Values), isEqual: { $0 == $1 })
         self.roundTrip(URL(string: "test.com/random.orgdasdioahgsfas@dalk"), isEqual: { $0 == $1 })
         self.roundTrip(URL(string: "test.com")!, isEqual: { $0 == $1 })
         self.roundTrip(Decimal(), isEqual: { $0 == $1 })
@@ -81,6 +105,7 @@ class TestURLEncoder: XCTestCase {
         self.startEncodePathTest(with: Double.signalingNaN )
         self.startEncodePathTest(with: Date()          )
         self.startEncodePathTest(with: Data()          )
+        self.startEncodePathTest(with: "%%@(*#$&"          )
         
         self.startEncodePathTest(with: Objects.VisualCheck())
     }
@@ -88,12 +113,12 @@ class TestURLEncoder: XCTestCase {
     func testDecodePaths() {
         
         self.startDecodePathTest(with: Float    .self, from: "test"     , errorType: .typeMismatch(Float    .self))
-        self.startDecodePathTest(with: Int      .self, from: UInt64.max , errorType: .typeMismatch(Int      .self))
-        self.startDecodePathTest(with: UInt     .self, from: -1         , errorType: .typeMismatch(UInt     .self))
+        self.startDecodePathTest(with: Int      .self, from: UInt64.max , errorType: .dataCorrupted               )
+        self.startDecodePathTest(with: UInt     .self, from: -1         , errorType: .dataCorrupted               )
         self.startDecodePathTest(with: Bool     .self, from: 2          , errorType: .typeMismatch(Bool     .self)) // value never throws
         self.startDecodePathTest(with: Double   .self, from: "test"     , errorType: .typeMismatch(Double   .self))
         self.startDecodePathTest(with: String   .self, from: ""         , errorType: .valueNotFound(String  .self)) // empty should be nil
-        self.startDecodePathTest(with: URL      .self, from: "%"        , errorType: .dataCorrupted               ) // invalid url
+//        self.startDecodePathTest(with: URL      .self, from: "%"        , errorType: .dataCorrupted               ) // has to be decodable from a URL
         self.startDecodePathTest(with: Decimal  .self, from: "test"     , errorType: .typeMismatch(Decimal  .self))
         // .nan != .nan
         self.startDecodePathTest(with: Date.self, from: "test", errorType: .typeMismatch(Date.self))
@@ -339,7 +364,7 @@ class TestURLEncoder: XCTestCase {
                 
                 guard type(of: error.value) == expected else {
                     willFail()
-                    XCTFail("unexpected invalidValue: \(type(of: error.value)) expected: \(expected)")
+                    XCTFail("unexpected invalidValue: \(type(of: error.value)) expected: \(expected), error: \(error)")
                     return
                 }
                 
@@ -387,13 +412,15 @@ class TestURLEncoder: XCTestCase {
                 var serializer = URLQuerySerializer()
                 serializer.arraySerialization = .arraysAreDictionaries
                 
-                guard serializer.isValidObject(value) else {
+                do {
+                    try serializer.assertValidObject(value)
+                } catch {
                     willFail()
-                    XCTFail("\(type(of: value)) is not a valid URLQuery object")
+                    XCTFail("\(type(of: value)): \(value) is not a valid URLQuery object. error: \(error)")
                     return
                 }
                 
-                let data = try serializer.queryData(from: value)
+                let data = try! serializer.queryData(from: value)
                 
                 var decoder = self.newDecoder()
                 

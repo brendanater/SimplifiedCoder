@@ -2,9 +2,9 @@
 //  Encoder2.swift
 //  SimplifiedCoder
 //
-//  Created by Brendan Henderson on 8/23/17.
-//  Copyright © 2017 OKAY.
+//  MIT License
 //
+//  Copyright (c) 8/27/17 Brendan Henderson
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -13,17 +13,16 @@
 //  copies of the Software, and to permit persons to whom the Software is
 //  furnished to do so, subject to the following conditions:
 //
-//  The above copyright notice and this permission notice shall be included in
-//  all copies or substantial portions of the Software.
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
 //
 //  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 //  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 //  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 //  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-//  THE SOFTWARE.
-//
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
 
 import Foundation
 
@@ -161,10 +160,6 @@ public extension AnyEncoderBase {
     public func encode(_ value: Float ) throws { self.set(try self.box(value, at: self.codingPath)) }
     public func encode(_ value: Double) throws { self.set(try self.box(value, at: self.codingPath)) }
     public func encode<T: Encodable>(_ value: T) throws {
-        guard self.canEncodeNewValue else {
-            self.set(value)
-            fatalError("\(self) set did not catch setting a new value when canEncodeNewValue == false")
-        }
         
         let value = try self.box(value, at: self.codingPath)
         // box won't reset canEncodeNewValue, so reset here.
@@ -420,8 +415,8 @@ public extension EncoderJSONBase {
     public func box(_ value: Double         , at codingPath: [CodingKey]) throws -> Any { return try self.convert(json: value, at: codingPath) }
     public func box(_ value: Date           , at codingPath: [CodingKey]) throws -> Any { return try self.convert(json: value, at: codingPath) }
     public func box(_ value: Data           , at codingPath: [CodingKey]) throws -> Any { return try self.convert(json: value, at: codingPath) }
-    public func box(_ value: URL            , at codingPath: [CodingKey]) throws -> Any { return self.convert(json: value) }
-    public func box(_ value: Decimal        , at codingPath: [CodingKey]) throws -> Any { return value }
+    public func box(_ value: URL            , at codingPath: [CodingKey]) throws -> Any { return value.absoluteString }
+    public func box(_ value: Decimal        , at codingPath: [CodingKey]) throws -> Any { return try self.convert(json: value, at: codingPath) }
     public func box<T: Encodable>(_ value: T, at codingPath: [CodingKey]) throws -> Any {
         
         return try self.box(json: value, at: codingPath)
@@ -441,8 +436,37 @@ public extension EncoderJSONBase {
         }
     }
     
-    public func convert(json value: URL) -> String {
-        return value.absoluteString
+    public func convert(json value: Decimal, at codingPath: [CodingKey]) throws -> Any {
+        
+        if value.isInfinite || value.isNaN {
+            
+            if case .convertToString(let pos, let neg, let nan) = self.options.json.nonConformingFloatEncodingStrategy {
+                
+                if value.isInfinite {
+                    
+                    if value > 0 {
+                        return pos
+                    } else {
+                        return neg
+                    }
+                } else {
+                    return nan
+                }
+            } else {
+                
+                throw EncodingError.invalidValue(
+                    value,
+                    EncodingError.Context(
+                        codingPath: codingPath,
+                        debugDescription: "Unable to encode non-conforming Decimal directly. Use nonConformingFloatEncodingStrategy.convertToString to specify how the value should be encoded."
+                    )
+                )
+            }
+            
+        } else {
+            
+            return value
+        }
     }
     
     public func convert(json value: Date, at codingPath: [CodingKey]) throws -> Any {
@@ -459,7 +483,9 @@ public extension EncoderJSONBase {
             
         case .iso8601:
             if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-                return ISO8601DateFormatter.shared.string(from: value)
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = .withInternetDateTime
+                return formatter.string(from: value)
             } else {
                 fatalError("ISO8601DateFormatter is unavailable on this platform.")
             }
@@ -496,7 +522,7 @@ public extension EncoderJSONBase {
                     value,
                     EncodingError.Context.init(
                         codingPath: codingPath,
-                        debugDescription: "Unable to encode \(T.self) (\(value)) directly. Use nonConformingFloatEncodingStrategy.convertToString to specify how the value should be encoded."
+                        debugDescription: "Unable to encode non-conforming \(T.self) directly. Use nonConformingFloatEncodingStrategy.convertToString to specify how the value should be encoded."
                     )
                 )
             }

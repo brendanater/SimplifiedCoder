@@ -1,9 +1,7 @@
 //
 //  JSONDecoder.swift
-//  Retrolux
 //
 //  Created by Brendan Henderson on 9/25/17.
-//  Copyright © 2017 Christopher Bryan Henderson. All rights reserved.
 //
 
 import Foundation

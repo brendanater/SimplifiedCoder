@@ -2,9 +2,9 @@
 //  Decoder.swift
 //  SimplifiedCoder
 //
-//  Created by Brendan Henderson on 8/27/17.
-//  Copyright © 2017 OKAY. 
+//  MIT License
 //
+//  Copyright (c) 8/27/17 Brendan Henderson
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -13,17 +13,16 @@
 //  copies of the Software, and to permit persons to whom the Software is
 //  furnished to do so, subject to the following conditions:
 //
-//  The above copyright notice and this permission notice shall be included in
-//  all copies or substantial portions of the Software.
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
 //
 //  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 //  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 //  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 //  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-//  THE SOFTWARE.
-//
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
 
 import Foundation
 import Swift
@@ -208,13 +207,23 @@ public extension AnyDecoderBase {
     
     public func convert(bool value: Any, at codingPath: [CodingKey]) throws -> Bool {
         
-        if (value as? NSNumber)?.isBoolean ?? false, let value = value as? Bool {
+        if let value = value as? Bool {
             
             return value
             
-        } else if let value = value as? String, let bool = Bool(value) {
+        } else if let value = value as? String {
             
-            return bool
+            if let bool = Bool(value) {
+                return bool
+                
+            } else if value.count < 10 {
+                
+                switch value.lowercased() {
+                case "true", "yes", "1": return true
+                case "false", "no", "0": return false
+                default: break
+                }
+            }
         }
         
         throw failedToUnbox(value, to: Bool.self, at: codingPath)
@@ -222,26 +231,34 @@ public extension AnyDecoderBase {
     
     public func convert<T: ConvertibleNumber>(number value: Any, at codingPath: [CodingKey]) throws -> T {
         
-        if (value as? NSNumber)?.isBoolean ?? false {
-            // skip
+        guard !isBoolean(value as AnyObject) else {
+            throw self.failedToUnbox(value, to: T.self, at: codingPath)
+        }
+        
+        // if value is T or NSNumber, try to skip number from nsnumber
+        if let number = value as? T {
+            return number
             
-        } else if value is T {// value is T is more accurate than as? T
+            // if value is castable to NSNumber, or value is NSNumber and cannot be casted as T
+        } else if let value = value as? NSNumber {
             
-            return value as! T
-            
-        } else if value is NSNumber, let value = value as? NSNumber, let number = T(exactly: value) {
-            
-            if number is NSNumber {
-                if number as? NSNumber == value {
-                    return number
-                }
+            if let number = value as? T ?? T(exactly: value) {
+                // shouldn't need to check number == value
+                return number
+                
             } else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Parsed number <\(value)> does not fit in \(T.self)."))
+            }
+            
+        } else if let value = value as? String {
+            
+            if let number = T(value) {
                 return number
             }
             
-        } else if let value = value as? String, let number = T(value) {
-            
-            return number
+            if (Decimal(value) as Any? ?? Double(value)) != nil {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: codingPath, debugDescription: "Parsed number <\(value)> does not fit in \(T.self)."))
+            }
         }
         
         throw self.failedToUnbox(value, to: T.self, at: codingPath)
@@ -423,22 +440,22 @@ public extension DecoderJSONBase {
     
     typealias JSONOptions = (json: JSONDecoder.Options, extra: Self.ExtraOptions)
     
-    // convert(json: means that it is specific to a JSON compatible value and a decoding strategy
+    // convert(json: means that it is specific to a JSON decoding strategy
     
-    func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Float   { return try self.convert(json  : value, at: codingPath) }
-    func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Double  { return try self.convert(json  : value, at: codingPath) }
-    func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Date    { return try self.convert(json  : value, at: codingPath) }
-    func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Data    { return try self.convert(json  : value, at: codingPath) }
-    func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> URL     { return try self.convert(url   : value, at: codingPath) }
-    func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Decimal { return try self.convert(number: value, at: codingPath) }
-    func unbox<T>(_ value: Any, at codingPath: [CodingKey]) throws -> T where T : Decodable {
+    public func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Float   { return try self.convert(json  : value, at: codingPath) }
+    public func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Double  { return try self.convert(json  : value, at: codingPath) }
+    public func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Date    { return try self.convert(json  : value, at: codingPath) }
+    public func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Data    { return try self.convert(json  : value, at: codingPath) }
+    public func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> URL     { return try self.convert(url   : value, at: codingPath) }
+    public func unbox(_ value: Any, at codingPath: [CodingKey]) throws -> Decimal { return try self.convert(number: value, at: codingPath) }
+    public func unbox<T>(_ value: Any, at codingPath: [CodingKey]) throws -> T where T : Decodable {
         
         return try self.unbox(json: value, at: codingPath)
             ?? self.unbox(default: value, at: codingPath)
             ?? self.redecode(value, at: codingPath)
     }
     
-    func unbox<T>(json value: Any, at codingPath: [CodingKey]) throws -> T? where T : Decodable {
+    public func unbox<T>(json value: Any, at codingPath: [CodingKey]) throws -> T? where T : Decodable {
         switch T.self {
         case is Date.Type   , is NSDate.Type         : return try self.unbox(value, at: codingPath) as Date    as? T
         case is Data.Type   , is NSData.Type         : return try self.unbox(value, at: codingPath) as Data    as? T
@@ -448,7 +465,7 @@ public extension DecoderJSONBase {
         }
     }
     
-    func convert(json value: Any, at codingPath: [CodingKey]) throws -> Data {
+    public func convert(json value: Any, at codingPath: [CodingKey]) throws -> Data {
         
         switch self.options.json.dataDecodingStrategy {
             
@@ -481,7 +498,9 @@ public extension DecoderJSONBase {
             
         case .iso8601:
             if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-                guard let date = ISO8601DateFormatter.shared.date(from: try self.unbox(value, at: codingPath)) else {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = .withInternetDateTime
+                guard let date = formatter.date(from: try self.unbox(value, at: codingPath)) else {
                     throw self.corrupted("Expected date string to be ISO8601-formatted.", at: codingPath)
                 }
                 return date
@@ -500,7 +519,7 @@ public extension DecoderJSONBase {
         }
     }
     
-    func convert<T: FloatingPoint & ConvertibleNumber>(json value: Any, at codingPath: [CodingKey]) throws -> T {
+    func convert<T: BinaryFloatingPoint & ConvertibleNumber>(json value: Any, at codingPath: [CodingKey]) throws -> T {
         
         do {
             
@@ -537,7 +556,7 @@ public extension DecoderJSONBase {
                 
             } else {
                 
-                throw self.corrupted("Invalid url from string: \(value)", at: codingPath)
+                throw self.corrupted("Invalid URL string", at: codingPath)
             }
         }
         
@@ -957,6 +976,20 @@ public protocol ConvertibleNumber {
     
     init?(_: String)
     init?(exactly: NSNumber)
+    
+    static var isInteger: Bool {get}
+}
+
+extension ConvertibleNumber where Self: BinaryFloatingPoint {
+    public static var isInteger: Bool {
+        return false
+    }
+}
+
+extension ConvertibleNumber where Self: BinaryInteger {
+    public static var isInteger: Bool {
+        return true
+    }
 }
 
 extension Int    : ConvertibleNumber {}
@@ -976,37 +1009,37 @@ extension Decimal: ConvertibleNumber {
     
     public init?(_ string: String) {
         
-        self.init(string: string)
+        if let _self = Decimal(string: string) {
+            self.init()
+            self = _self
+            
+            // get nan, inf, -inf
+        } else if let double = Double(string) {
+            self.init(double)
+        } else {
+            return nil
+        }
     }
     
-    public init?(exactly: NSNumber) {
+    public init?(exactly number: NSNumber) {
         
-        if let number = Double(exactly: exactly) { self.init(number)
-        } else if let number = Int   (exactly: exactly) { self.init(number)
-        } else if let number = Int8  (exactly: exactly) { self.init(number)
-        } else if let number = Int16 (exactly: exactly) { self.init(number)
-        } else if let number = Int32 (exactly: exactly) { self.init(number)
-        } else if let number = Int64 (exactly: exactly) { self.init(number)
-        } else if let number = UInt  (exactly: exactly) { self.init(number)
-        } else if let number = UInt8 (exactly: exactly) { self.init(number)
-        } else if let number = UInt16(exactly: exactly) { self.init(number)
-        } else if let number = UInt32(exactly: exactly) { self.init(number)
-        } else if let number = UInt64(exactly: exactly) { self.init(number)
+        if number is Decimal {
+            self.init()
+            self = number.decimalValue
+        } else if let number = UInt(exactly: number) {
+            self.init(number)
+        } else if let number = Int(exactly: number) {
+            self.init(number)
+        } else if let number = Double(exactly: number) {
+            self.init(number)
         } else {
-            
-            let value = exactly.decimalValue
-            
-            if (value as NSNumber).isEqual(to: exactly) {
-                
-                self.init()
-                
-                self = value
-                
-            } else {
-                
-                return nil
-            }
+            return nil
         }
+    }
+    
+    /// tells any converter whether to init with a Double or not
+    public static var isInteger: Bool {
+        return false
     }
 }
 
