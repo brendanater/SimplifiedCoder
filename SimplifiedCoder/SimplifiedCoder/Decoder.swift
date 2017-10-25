@@ -32,8 +32,24 @@ public protocol TopLevelDecoder {
     
     var userInfo: [CodingUserInfoKey : Any] {get set}
     
-    func decode<T: Decodable>(_: T.Type, from data: Data) throws -> T
-    func decode<T: Decodable>(_: T.Type, fromValue value: Any) throws -> T
+    func decode<T: Decodable>(from data: Data) throws -> T
+    func decode<T: Decodable>(fromValue value: Any) throws -> T
+}
+
+extension TopLevelDecoder {
+    func decode<T: Decodable>(_: T.Type, from data: Data) throws -> T {
+        return try self.decode(from: data)
+    }
+    
+    func decode<T: Decodable>(_: T.Type, fromValue value: Any) throws -> T {
+        return try self.decode(fromValue: value)
+    }
+}
+
+public extension Decodable {
+    public init(with decoder: TopLevelDecoder = JSONDecoder(), from data: Data) throws {
+        self = try decoder.decode(Self.self, from: data)
+    }
 }
 
 // MARK: AnyBase

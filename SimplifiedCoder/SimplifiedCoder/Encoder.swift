@@ -37,6 +37,12 @@ public protocol TopLevelEncoder {
     func encode<T: Encodable>(value: T) throws -> Any
 }
 
+public extension Encodable {
+    public func encode(to encoder: TopLevelEncoder = JSONEncoder()) throws -> Data {
+        return try encoder.encode(self)
+    }
+}
+
 // MARK AnyBase
 
 public enum EncoderReference {
