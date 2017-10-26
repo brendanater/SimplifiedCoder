@@ -29,7 +29,7 @@ import Foundation
 /// the encoder that the user calls to abstract away complexity
 public protocol TopLevelEncoder {
     
-    static var contentType: String {get}
+    var contentType: String {get}
     
     var userInfo: [CodingUserInfoKey : Any] {get set}
     

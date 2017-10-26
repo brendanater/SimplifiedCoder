@@ -28,7 +28,6 @@ import Foundation
 import XCTest
 import SimplifiedCoder
 
-
 class TestExpectedPaths: XCTestCase {
     
     func newEncoder() -> JSONEncoder {
@@ -42,6 +41,16 @@ class TestExpectedPaths: XCTestCase {
     let testingDepth = 3
     
     typealias Objects = CoderTesting.Objects
+    
+    func testJSONDecodeFunctionsNonLooping() {
+        
+        let data = try! self.newEncoder().encode([1])
+        
+        _ = try! JSONDecoder().decode([Int].self, from: data)
+        _ = try! (JSONDecoder() as TopLevelDecoder).decode([Int].self, from: data)
+        _ = try! JSONDecoder().decode(from: data) as [Int]
+        _ = try! (JSONDecoder() as TopLevelDecoder).decode(from: data) as [Int]
+    }
     
     func testEncodePaths() {
         

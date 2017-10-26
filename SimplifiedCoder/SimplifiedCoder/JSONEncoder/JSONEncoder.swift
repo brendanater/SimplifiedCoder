@@ -8,7 +8,9 @@ import Foundation
 
 extension JSONEncoder: TopLevelEncoder {
     
-    public static var contentType: String = "application/json"
+    public var contentType: String {
+        return "application/json"
+    }
 
     public func encode<T: Encodable>(value: T) throws -> Any {
         

@@ -50,7 +50,6 @@ class TestURLDecoder: XCTestCase {
         let expectedResult2 = "key[1]=\(UInt64.min)&key[0]=\(UInt64.max)"
 
         do {
-            
             let result = try decoder.decode(type(of: value), from: expectedResult)
             
             if result["key"]?.count == 2, result["key"]?[0] == UInt64.max && result["key"]?[1] == UInt64.min {

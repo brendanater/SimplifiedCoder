@@ -263,4 +263,38 @@ public extension Dictionary {
     }
 }
 
+// String.Encoding
+
+extension String.Encoding {
+    /// for HTTP header charset descriptions e.g. "; charset=UTF-8"
+    var charsetDescription: String? {
+        switch self {  // nil == couldn't find
+        case .ascii:            return "ASCII"
+        case .iso2022JP:        return "ISO-2022-JP"
+        case .isoLatin1:        return "ISO-8859-1"
+        case .isoLatin2:        return "ISO-8859-2"
+        case .japaneseEUC:      return "EUC-JP"
+        case .macOSRoman:       return "macintosh" // https://en.wikipedia.org/wiki/Mac_OS_Roman () IANA: "macintosh", JAVA: "MacRoman"
+        case .nextstep:         return nil
+        case .nonLossyASCII:    return nil
+        case .shiftJIS:         return "Shift_JIS"
+        case .symbol:           return nil
+        case .unicode:          return "UTF-16"
+        case .utf16:            return "UTF-16"
+        case .utf16BigEndian:   return "UTF-16BE"
+        case .utf16LittleEndian:return "UTF-16LE"
+        case .utf32:            return "UTF-32"
+        case .utf32BigEndian:   return "UTF-32BE"
+        case .utf32LittleEndian:return "UTF-32LE"
+        case .utf8:             return "UTF-8"
+        case .windowsCP1250:    return nil
+        case .windowsCP1251:    return nil
+        case .windowsCP1252:    return "windows-1252"
+        case .windowsCP1253:    return nil
+        case .windowsCP1254:    return nil
+        default: return nil
+        }
+    }
+}
+
 

@@ -36,12 +36,12 @@ public protocol TopLevelDecoder {
     func decode<T: Decodable>(fromValue value: Any) throws -> T
 }
 
-extension TopLevelDecoder {
-    func decode<T: Decodable>(_: T.Type, from data: Data) throws -> T {
+public extension TopLevelDecoder {
+    public func decode<T: Decodable>(_: T.Type, from data: Data) throws -> T {
         return try self.decode(from: data)
     }
     
-    func decode<T: Decodable>(_: T.Type, fromValue value: Any) throws -> T {
+    public func decode<T: Decodable>(_: T.Type, fromValue value: Any) throws -> T {
         return try self.decode(fromValue: value)
     }
 }

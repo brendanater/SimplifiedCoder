@@ -8,6 +8,13 @@ import Foundation
 
 
 extension JSONDecoder: TopLevelDecoder {
+    public func decode<T>(from data: Data) throws -> T where T : Decodable {
+        return try self.decode(T.self, from: data)
+    }
+    
+    public func decode<T>(fromValue value: Any) throws -> T where T : Decodable {
+        return try self.decode(T.self, fromValue: value)
+    }
     
     // decoding
     
