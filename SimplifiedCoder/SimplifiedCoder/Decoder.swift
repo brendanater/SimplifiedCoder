@@ -36,19 +36,9 @@ public protocol TopLevelDecoder {
     func decode<T: Decodable>(fromValue value: Any) throws -> T
 }
 
-public extension TopLevelDecoder {
-    public func decode<T: Decodable>(_: T.Type, from data: Data) throws -> T {
-        return try self.decode(from: data)
-    }
-    
-    public func decode<T: Decodable>(_: T.Type, fromValue value: Any) throws -> T {
-        return try self.decode(fromValue: value)
-    }
-}
-
 public extension Decodable {
-    public init(with decoder: TopLevelDecoder = JSONDecoder(), from data: Data) throws {
-        self = try decoder.decode(Self.self, from: data)
+    public init(from data: Data, using decoder: TopLevelDecoder = JSONDecoder()) throws {
+        self = try decoder.decode(from: data)
     }
 }
 

@@ -83,7 +83,7 @@ class TestURLQuerySerializer: XCTestCase {
             
             let query = try self.serializer.query(from: value)
             
-            XCTAssert(query == expectQuery, """
+            XCTAssert(query == expectQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!, """
                 unequal:
                 query:  \(query)
                 expect: \(expectQuery)

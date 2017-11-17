@@ -29,16 +29,16 @@ import Foundation
 /// the encoder that the user calls to abstract away complexity
 public protocol TopLevelEncoder {
     
-    var contentType: String {get}
-    
     var userInfo: [CodingUserInfoKey : Any] {get set}
+    
+    var contentType: String {get}
     
     func encode<T: Encodable>(_ value: T) throws -> Data
     func encode<T: Encodable>(value: T) throws -> Any
 }
 
 public extension Encodable {
-    public func encode(to encoder: TopLevelEncoder = JSONEncoder()) throws -> Data {
+    public func encode(with encoder: TopLevelEncoder = JSONEncoder()) throws -> Data {
         return try encoder.encode(self)
     }
 }

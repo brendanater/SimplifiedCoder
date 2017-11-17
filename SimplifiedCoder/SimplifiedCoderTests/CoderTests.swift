@@ -44,10 +44,10 @@ class TestExpectedPaths: XCTestCase {
     
     func testJSONDecodeFunctionsNonLooping() {
         
-        let data = try! self.newEncoder().encode([1])
+        let data = try! self.newEncoder().encode([1]) as Data
         
-        _ = try! JSONDecoder().decode([Int].self, from: data)
-        _ = try! (JSONDecoder() as TopLevelDecoder).decode([Int].self, from: data)
+        _ = try! JSONDecoder().decode(from: data) as [Int]
+        _ = try! (JSONDecoder() as TopLevelDecoder).decode(from: data) as [Int]
         _ = try! JSONDecoder().decode(from: data) as [Int]
         _ = try! (JSONDecoder() as TopLevelDecoder).decode(from: data) as [Int]
     }
@@ -115,7 +115,7 @@ class TestExpectedPaths: XCTestCase {
                 encoder.dateEncodingStrategy = .custom { throw EncodingError.invalidValue($0, EncodingError.Context(codingPath: $1.codingPath, debugDescription: "threw at path")) }
                 encoder.dataEncodingStrategy = .custom { throw EncodingError.invalidValue($0, EncodingError.Context(codingPath: $1.codingPath, debugDescription: "threw at path")) }
                 
-                _ = try encoder.encode(value)
+                _ = try encoder.encode(value) as Data
                 
                 willFail()
                 XCTFail("failed to throw")

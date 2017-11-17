@@ -183,7 +183,7 @@ fileprivate protocol _OptionalWrapping {
 }
 
 extension Optional: _OptionalWrapping {
-    var _wrapped: Any? {
+    fileprivate var _wrapped: Any? {
         return self
     }
 }
@@ -210,10 +210,6 @@ extension NSNumber {
         return isBoolean(self)
     }
 }
-
-// ObjectIdentifier
-
-public typealias TypeID = ObjectIdentifier
 
 // array
 
@@ -254,8 +250,8 @@ public extension Array {
 
 // dictionary
 
-public extension Dictionary {
-    init(_ elements: [Element]) {
+extension Dictionary {
+    public init(_ elements: [Element]) {
         self.init()
         for (key, value) in elements {
             self[key] = value
@@ -266,19 +262,21 @@ public extension Dictionary {
 // String.Encoding
 
 extension String.Encoding {
-    /// for HTTP header charset descriptions e.g. "; charset=UTF-8"
-    var charsetDescription: String? {
+    
+    /// for HTTP header charset e.g. "; charset=UTF-8"
+    public var charset: String? {
         switch self {  // nil == couldn't find
-        case .ascii:            return "ASCII"
+        case .ascii:            return "US-ASCII" // https://en.wikipedia.org/wiki/ASCII "ASCII"
         case .iso2022JP:        return "ISO-2022-JP"
         case .isoLatin1:        return "ISO-8859-1"
         case .isoLatin2:        return "ISO-8859-2"
         case .japaneseEUC:      return "EUC-JP"
-        case .macOSRoman:       return "macintosh" // https://en.wikipedia.org/wiki/Mac_OS_Roman () IANA: "macintosh", JAVA: "MacRoman"
+        case .macOSRoman:       return "macintosh" // https://en.wikipedia.org/wiki/Mac_OS_Roman JAVA: "MacRoman"
         case .nextstep:         return nil
         case .nonLossyASCII:    return nil
         case .shiftJIS:         return "Shift_JIS"
         case .symbol:           return nil
+        case .utf8:             return "UTF-8"
         case .unicode:          return "UTF-16"
         case .utf16:            return "UTF-16"
         case .utf16BigEndian:   return "UTF-16BE"
@@ -286,7 +284,6 @@ extension String.Encoding {
         case .utf32:            return "UTF-32"
         case .utf32BigEndian:   return "UTF-32BE"
         case .utf32LittleEndian:return "UTF-32LE"
-        case .utf8:             return "UTF-8"
         case .windowsCP1250:    return nil
         case .windowsCP1251:    return nil
         case .windowsCP1252:    return "windows-1252"
@@ -295,6 +292,37 @@ extension String.Encoding {
         default: return nil
         }
     }
+    
+    
+    public init?(charset: String) {
+        
+        switch charset.uppercased() {
+        case "US-ASCII"     : self = .ascii
+        case "ISO-2022-JP"  : self = .iso2022JP
+        case "ISO-8859-1"   : self = .isoLatin1
+        case "ISO-8859-2"   : self = .isoLatin2
+        case "EUC-JP"       : self = .japaneseEUC
+        case "SHIFT_JIS"    : self = .shiftJIS // "Shift_JIS"
+        case "UTF-8"        : self = .utf8
+        case "UTF-16"       : self = .utf16
+        case "UTF-16BE"     : self = .utf16BigEndian
+        case "UTF-16LE"     : self = .utf16LittleEndian
+        case "UTF-32"       : self = .utf32
+        case "UTF-32BE"     : self = .utf32BigEndian
+        case "UTF-32LE"     : self = .utf32LittleEndian
+            
+        case "ASCII"        : self = .ascii // IANA deprecated
+        case "ANSI"         : self = .windowsCP1252 // common mislabel
+        case "MACROMAN"     : self = .macOSRoman // java "MacRoman"
+        default:
+            switch charset.lowercased() {
+            case "macintosh"    : self = .macOSRoman
+            case "windows-1252" : self = .windowsCP1252
+            default: return nil
+            }
+        }
+    }
 }
+
 
 

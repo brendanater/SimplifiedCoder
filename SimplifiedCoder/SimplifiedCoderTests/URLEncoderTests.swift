@@ -105,7 +105,7 @@ class TestURLEncoder: XCTestCase {
         self.startEncodePathTest(with: Double.signalingNaN )
         self.startEncodePathTest(with: Date()          )
         self.startEncodePathTest(with: Data()          )
-        self.startEncodePathTest(with: "%%@(*#$&"          )
+//        self.startEncodePathTest(with: "%%@(*#$&"          ) // any String is valid now
         
         self.startEncodePathTest(with: Objects.VisualCheck())
     }
@@ -219,7 +219,7 @@ class TestURLEncoder: XCTestCase {
                 
                 data = try encoder.encode(start)
                 
-                let query1 = String(data: data, encoding: URLQuerySerializer().dataStringEncoding)!
+                let query1 = String(data: data, encoding: stringEncoding)!
                 let query2: String
                 do {
                     query2 = try encoder.serializer.query(from: value)
@@ -253,7 +253,7 @@ class TestURLEncoder: XCTestCase {
                 }
                 decoder.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
                 
-                let result = try decoder.decode(T.self, from: data)
+                let result = try decoder.decode(from: data) as T
                 
                 guard isEqual(start, result) else {
                     
@@ -280,7 +280,7 @@ class TestURLEncoder: XCTestCase {
                 }
                 decoder.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: "inf", negativeInfinity: "-inf", nan: "nan")
                 
-                let result = try decoder.decode(T.self, fromValue: value)
+                let result = try decoder.decode(fromValue: value) as T
                 
                 guard isEqual(start, result) else {
                     
@@ -428,7 +428,7 @@ class TestURLEncoder: XCTestCase {
                 decoder.dataDecodingStrategy = .custom { throw DecodingError.typeMismatch(Data.self, DecodingError.Context(codingPath: $0.codingPath, debugDescription: "threw at path")) }
                 decoder.serializer.arraySerialization = .arraysAreDictionaries
                 
-                _ = try decoder.decode(decodable, from: data)
+                _ = try decoder.decode(from: data) as D
                 
                 willFail()
                 XCTFail("failed to throw")
@@ -472,8 +472,8 @@ class TestURLEncoder: XCTestCase {
     
     var encoder = URLEncoder()
     
-    var encoding: String.Encoding {
-        return encoder.serializer.dataStringEncoding
+    var stringEncoding: String.Encoding {
+        return encoder.serializer.stringEncoding
     }
 
     func encode<T: Encodable>(_ value: T) throws -> Data {
@@ -484,11 +484,11 @@ class TestURLEncoder: XCTestCase {
 
         let value = ["key": [1]]
 
-        let expectedResult = "key[]=1"
+        let expectedResult = "key[]=1".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
 
         do {
 
-            let string = try String(data: self.encoder.encode(value), encoding: encoder.serializer.dataStringEncoding)
+            let string = try String(data: self.encode(value), encoding: stringEncoding)
 
             XCTAssert(string != nil)
 
@@ -524,11 +524,11 @@ class TestURLEncoder: XCTestCase {
 
         let value = ["key": ["key2":1]]
 
-        let expectedResult = "key[key2]=1"
+        let expectedResult = "key[key2]=1".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
 
         do {
 
-            let string = try String(data: self.encode(value), encoding: encoder.serializer.dataStringEncoding)
+            let string = try String(data: self.encode(value), encoding: stringEncoding)
 
             XCTAssert(string != nil)
 
@@ -543,11 +543,11 @@ class TestURLEncoder: XCTestCase {
 
         let value = ["key": ["key1":["key2": ["key3": 3], "key4": ["key5": 4]]]]
 
-        let expectedResult = "key[key1][key2][key3]=3&key[key1][key4][key5]=4"
+        let expectedResult = "key[key1][key2][key3]=3&key[key1][key4][key5]=4".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
 
         do {
 
-            let string = try String(data: self.encode(value), encoding: encoder.serializer.dataStringEncoding)
+            let string = try String(data: self.encode(value), encoding: stringEncoding)
 
             XCTAssert(string != nil)
 
@@ -564,7 +564,7 @@ class TestURLEncoder: XCTestCase {
 
         do {
 
-            let value2 = try String(data: self.encode(value), encoding: encoder.serializer.dataStringEncoding)
+            let value2 = try String(data: self.encode(value), encoding: stringEncoding)
 
             XCTFail("encoder did not throw: \(value2 ?? "<void>__")")
 
@@ -617,11 +617,11 @@ class TestURLEncoder: XCTestCase {
 
         let value = Object1()
 
-        let expectedResult = "value=1&array[]=1&dictionary[key]=2&nestedDictionary[key][]=1"
+        let expectedResult = "value=1&array[]=1&dictionary[key]=2&nestedDictionary[key][]=1".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
 
         do {
 
-            let string = try String(data: self.encode(value), encoding: encoder.serializer.dataStringEncoding)
+            let string = try String(data: self.encode(value), encoding: stringEncoding)
 
             XCTAssert(string == expectedResult, "Incorrect result: \(string!)")
 
@@ -634,11 +634,11 @@ class TestURLEncoder: XCTestCase {
 
         let value = WithNestedClass()
 
-        let expectedResult = "value=1&value2=test&nested[value]=1&nested[nested][value]=1"
+        let expectedResult = "value=1&value2=test&nested[value]=1&nested[nested][value]=1".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
 
         do {
 
-            let string = try String(data: self.encode(value), encoding: encoding)
+            let string = try String(data: self.encode(value), encoding: stringEncoding)
 
             XCTAssert(string != nil)
 
