@@ -160,12 +160,8 @@ public protocol CanBeNil {
 extension NSNull: CanBeNil { public var isNil: Bool { return true } }
 extension Optional: CanBeNil {
     public var isNil: Bool {
-        if case .some(let wrapped) = self {
-            if let canBeNil = wrapped as? CanBeNil {
-                return canBeNil.isNil
-            } else {
-                return false
-            }
+        if let wrapped = self {
+            return (wrapped as? CanBeNil)?.isNil ?? false
         } else {
             return true
         }
